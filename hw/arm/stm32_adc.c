@@ -584,7 +584,8 @@ and ADC2
 
 
 
-unsigned short ADC_values[31];
+unsigned short ADC_values[31]={31,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,
+                               24,25,26,27,28,29,30};
 
 /* --- Function prototypes ------------------------------------------------- */
 
@@ -702,7 +703,7 @@ static void stm32_ADC_update_irq(Stm32Adc *s) {
 
 static void stm32_adc_conv_complete(Stm32Adc *s)
 {
-  s-> ADC_SR|=ADC_SR_EOC;  // jmf : indicates end of conversion
+  s-> ADC_SR |= ADC_SR_EOC;
   stm32_ADC_update_irq(s); 
 }
 
@@ -725,11 +726,14 @@ static void stm32_adc_start_conv(Stm32Adc *s)
           //s->ADC_DR=((int)(1024.*(sin(2*M_PI*qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL)/1e9)+1.))&0xfff);
           s->ADC_DR=ADC_values[channel_number]&0xFFF;
       }
-      s->ADC_SR&=~ADC_SR_EOC;  // jmf : indicates ongoing conversion
+      s->ADC_SR &= ~ADC_SR_EOC; 
+
       s->ADC_CR2&=~ADC_CR2_SWSTART;
       // calls conv_complete when expires      
       if (s->conv_continuous == false)
           timer_mod(s->conv_timer,  curr_time + stm32_ADC_get_nbr_cycle_per_sample(s,channel_number)); 
+
+      stm32_ADC_update_irq(s); //(SR_EOC=0) require interrupt update
 }
 
 /* TIMER HANDLERS */
@@ -737,6 +741,7 @@ static void stm32_adc_start_conv(Stm32Adc *s)
 static void stm32_adc_conv_timer_expire(void *opaque) {
     Stm32Adc *s = (Stm32Adc *)opaque;
     stm32_adc_conv_complete(s);
+
 }
 
 //Continuous
@@ -750,8 +755,8 @@ static void stm32_adc_conv_timer_expire_cont(void *opaque) {
 
 	//printf("%llu!\n", stm32_ADC_get_nbr_cycle_per_sample(s,stm32_ADC_get_channel_number(s,1)));
 
-	//timer_mod(s->conv_timer_cont,  curr_time + stm32_ADC_get_nbr_cycle_per_sample(s,stm32_ADC_get_channel_number(s,1)) );
-	timer_mod(s->conv_timer_cont,  curr_time + (stm32_ADC_get_nbr_cycle_per_sample(s, stm32_ADC_get_channel_number(s,1) ) * (1e3)) );
+	timer_mod(s->conv_timer_cont,  curr_time + stm32_ADC_get_nbr_cycle_per_sample(s,stm32_ADC_get_channel_number(s,1)) );
+	//timer_mod(s->conv_timer_cont,  curr_time + (stm32_ADC_get_nbr_cycle_per_sample(s, stm32_ADC_get_channel_number(s,1) ) * (1e3)) );
 	//timer_mod(s->conv_timer_cont,  curr_time + ( 20 * (1e3)) );
 }
 
@@ -809,7 +814,6 @@ static uint64_t stm32_ADC_get_nbr_cycle_per_sample(Stm32Adc* s,int channel)
         index_cycle=(s->ADC_SMPR1 >> 3*(channel-10)) & 0x00000007; //recover index cycle from ADC sample time register 1 (SMPR1)
     else 
         index_cycle=(s->ADC_SMPR2 >> 3*channel) & 0x00000007;  //recover index cycle from ADC sample time register 2 (SMPR2)
-        
     /* index_cycle(0-7) numbers of cycles correspondent 
      (1.5, 7.5, 13.5, 28.5, 41.5, 55.5, 71.5, 239.5) */  
     return s->ns_per_sample[index_cycle];
@@ -819,21 +823,9 @@ static uint64_t stm32_ADC_get_nbr_cycle_per_sample(Stm32Adc* s,int channel)
 static void stm32_ADC_SR_write(Stm32Adc *s, uint32_t new_value)
 {
     /* The ADC_SR flags can be cleared, but not set. */
+/* these registers can be read and set to zero by writing zero. Writing 1 has no effect */
 
-    if(new_value & ADC_SR_EOC)
-        stm32_hw_warn("Software attempted to set ADC SR_EOC bit\n");
-    if(new_value & ADC_SR_JEOC)
-        stm32_hw_warn("Software attempted to set ADC SR_JEOC bit\n");  
-    if(new_value & ADC_SR_AWD)
-        stm32_hw_warn("Software attempted to set ADC SR_EOC bit\n");
-    if(new_value & ADC_SR_JSTRT)
-        stm32_hw_warn("Software attempted to set ADC SR_JSTRT bit\n");
-    if(new_value & ADC_SR_STRT)
-        stm32_hw_warn("Software attempted to set ADC SR_STRT bit\n");
-
-
-    s->ADC_SR= new_value & 0x0000001f;
-
+    s->ADC_SR &= new_value & 0x0000001f;
     stm32_ADC_update_irq(s); //modification of ADC_SR requiere update of interrupt 
 }
 
@@ -841,7 +833,7 @@ static void stm32_ADC_SQR1_write(Stm32Adc *s,uint32_t new_value)
 {  
     /* check if number of conversion (ADC_SQR1[24 20]) greater than 1 */  
      if((new_value >> 20 & 0x0000000f) > 1) 
-     hw_error("Mode Single conversion is only implemented\n");
+        hw_error("Mode Single conversion is only implemented\n");
 
      s->ADC_SQR1=new_value & 0x00ffffff;
 }
@@ -860,7 +852,7 @@ static void stm32_ADC_CR2_write(Stm32Adc *s,uint32_t new_value)
         stm32_ADC_GPIO_check(s,stm32_ADC_get_channel_number(s,1)); // check GPIO (Mode and config)  ANALOG INTPUT?  
         stm32_adc_start_conv(s); // jmf : software conv
 	  } else {
-        printf("ignore request ADC_CR2_SWSTART!\n");
+        stm32_hw_warn("ignore request ADC_CR2_SWSTART!\n");
 	  }
     } else if (s->ADC_CR2&ADC_CR2_CONT )  
     {
@@ -891,16 +883,19 @@ static uint32_t stm32_ADC_DR_read(Stm32Adc *s)
   
    /* check conversion complete*/
    if(s->ADC_SR & ADC_SR_EOC)
-     {           
-       s->ADC_SR &=~((uint32_t)ADC_SR_EOC); //cleared SR_EOC flag by reading ADC_DR   
-       stm32_ADC_update_irq(s); // (SR_EOC=0) requiere interrupt update
-       return s->ADC_DR;
-     }
-   else
-     {
-       stm32_hw_warn("Attempted to read ADC_DR while conversion is not complete\n");
-       return 0;
-     }
+   {           
+       s->ADC_SR &=~((uint32_t)ADC_SR_EOC); //cleared SR_EOC flag by reading ADC_DR  
+        
+       stm32_ADC_update_irq(s); // (SR_EOC=0) require interrupt update
+       
+   }
+   //this is not an error to read the register if EOC is not set. 
+   //The bit can be reset before reading the register. This is what is done by cmsis...
+   /*else 
+   {
+       stm32_hw_info("Attempted to read ADC_DR while conversion is not complete\n");
+   }*/
+   return s->ADC_DR;
 }
 
 
@@ -946,22 +941,22 @@ static uint64_t stm32_adc_read(void *opaque, hwaddr offset,
         case oADC_SMPR1:return extract64(s->ADC_SMPR1,start, length);
         case oADC_SMPR2:return extract64(s->ADC_SMPR2,start, length);
         case oADC_JOFR1:return extract64(s->ADC_JOFR1,start, length);
-	case oADC_JOFR2:return extract64(s->ADC_JOFR2,start, length);
-	case oADC_JOFR3:return extract64(s->ADC_JOFR3,start, length);
-	case oADC_JOFR4:return extract64(s->ADC_JOFR4,start, length);
-	case oADC_HTR: 	return extract64(s->ADC_HTR,  start, length);
-	case oADC_LTR : return extract64(s->ADC_LTR,  start, length);
-	case oADC_SQR1: return extract64(s->ADC_SQR1, start, length);
-	case oADC_SQR2: return extract64(s->ADC_SQR2, start, length);
-	case oADC_SQR3: return extract64(s->ADC_SQR3, start, length);
-	case oADC_JSQR: return extract64(s->ADC_JSQR, start, length);
-	case oADC_JDR1: return extract64(s->ADC_JDR1, start, length);
-	case oADC_JDR2: return extract64(s->ADC_JDR2, start, length);
-	case oADC_JDR3: return extract64(s->ADC_JDR3, start, length);
-	case oADC_JDR4: return extract64(s->ADC_JDR4, start, length);
-	case oADC_DR  : return extract64(stm32_ADC_DR_read(s), start, length); 
+	    case oADC_JOFR2:return extract64(s->ADC_JOFR2,start, length);
+	    case oADC_JOFR3:return extract64(s->ADC_JOFR3,start, length);
+	    case oADC_JOFR4:return extract64(s->ADC_JOFR4,start, length);
+	    case oADC_HTR: 	return extract64(s->ADC_HTR,  start, length);
+	    case oADC_LTR : return extract64(s->ADC_LTR,  start, length);
+	    case oADC_SQR1: return extract64(s->ADC_SQR1, start, length);
+	    case oADC_SQR2: return extract64(s->ADC_SQR2, start, length);
+	    case oADC_SQR3: return extract64(s->ADC_SQR3, start, length);
+	    case oADC_JSQR: return extract64(s->ADC_JSQR, start, length);
+	    case oADC_JDR1: return extract64(s->ADC_JDR1, start, length);
+	    case oADC_JDR2: return extract64(s->ADC_JDR2, start, length);
+	    case oADC_JDR3: return extract64(s->ADC_JDR3, start, length);
+	    case oADC_JDR4: return extract64(s->ADC_JDR4, start, length);
+	    case oADC_DR  : return extract64(stm32_ADC_DR_read(s), start, length); 
         default:
-		fprintf(stderr, "jmf unknown read : %lld, size %d\n",(long long)offset,size);
+		    fprintf(stderr, "stm32_adc: unknown read : %lld, size %d\n",(long long)offset,size);
             STM32_BAD_REG(offset, size);
             return 0;
     }
@@ -973,6 +968,7 @@ static void stm32_adc_write(void *opaque, hwaddr offset,
     Stm32Adc *s = (Stm32Adc *)opaque;
     
     stm32_rcc_check_periph_clk((Stm32Rcc *)s->stm32_rcc, s->periph);
+    
 
     switch (offset & 0xfffffffc) {
         case oADC_SR : stm32_ADC_SR_write(s,value);break;
@@ -981,17 +977,17 @@ static void stm32_adc_write(void *opaque, hwaddr offset,
         case oADC_SMPR1:(s->ADC_SMPR1=value & 0x00ffffff);break;
         case oADC_SMPR2:(s->ADC_SMPR2=value & 0x3fffffff);break;
         case oADC_JOFR1:(s->ADC_JOFR1=value & 0x00000fff);break;
- 	case oADC_JOFR2:(s->ADC_JOFR2=value & 0x00000fff);break;
- 	case oADC_JOFR3:(s->ADC_JOFR3=value & 0x00000fff);break;
- 	case oADC_JOFR4:(s->ADC_JOFR4=value & 0x00000fff);break;
-	case oADC_HTR:  (s->ADC_HTR=value & 0x00000fff);break;
- 	case oADC_LTR:  (s->ADC_LTR=value & 0x00000fff);break;
-	case oADC_SQR1: stm32_ADC_SQR1_write(s,value);break;
-	case oADC_SQR2: (s->ADC_SQR2=value & 0x3fffffff);break;
-	case oADC_SQR3: (s->ADC_SQR3=value & 0x3fffffff);break;
-	case oADC_JSQR: (s->ADC_JSQR=value & 0x003fffff);break;
+     	case oADC_JOFR2:(s->ADC_JOFR2=value & 0x00000fff);break;
+     	case oADC_JOFR3:(s->ADC_JOFR3=value & 0x00000fff);break;
+     	case oADC_JOFR4:(s->ADC_JOFR4=value & 0x00000fff);break;
+	    case oADC_HTR:  (s->ADC_HTR=value & 0x00000fff);break;
+     	case oADC_LTR:  (s->ADC_LTR=value & 0x00000fff);break;
+	    case oADC_SQR1: stm32_ADC_SQR1_write(s,value);break;
+	    case oADC_SQR2: (s->ADC_SQR2=value & 0x3fffffff);break;
+	    case oADC_SQR3: (s->ADC_SQR3=value & 0x3fffffff);break;
+	    case oADC_JSQR: (s->ADC_JSQR=value & 0x003fffff);break;
 	
-        default: fprintf(stderr, "jmf unknown write : %lld, size %d\n",(long long)offset,size);
+        default: fprintf(stderr, "stm32_adc: unknown write : %lld, size %d\n",(long long)offset,size);
             STM32_BAD_REG(offset, 2);
             break;
     }
@@ -1002,14 +998,14 @@ void stm32_ADC_update_ns_per_sample(Stm32Adc *s)
   int i;
   //convert cycles to ns
   if(clk_freq){  
-  s->ns_per_sample[0]=(1000000000LL*1.5)/clk_freq;s->ns_per_sample[1]=(1000000000LL*7.5)/clk_freq;
-  s->ns_per_sample[2]=(1000000000LL*13.5)/clk_freq;s->ns_per_sample[3]=(1000000000LL*28.5)/clk_freq;
-  s->ns_per_sample[4]=(1000000000LL*41.5)/clk_freq;s->ns_per_sample[5]=(1000000000LL*55.5)/clk_freq;
-  s->ns_per_sample[6]=(1000000000LL*71.5)/clk_freq;s->ns_per_sample[7]=(1000000000LL*239.5)/clk_freq;
+      s->ns_per_sample[0]=(1000000000LL*1.5)/clk_freq;s->ns_per_sample[1]=(1000000000LL*7.5)/clk_freq;
+      s->ns_per_sample[2]=(1000000000LL*13.5)/clk_freq;s->ns_per_sample[3]=(1000000000LL*28.5)/clk_freq;
+      s->ns_per_sample[4]=(1000000000LL*41.5)/clk_freq;s->ns_per_sample[5]=(1000000000LL*55.5)/clk_freq;
+      s->ns_per_sample[6]=(1000000000LL*71.5)/clk_freq;s->ns_per_sample[7]=(1000000000LL*239.5)/clk_freq;
   }
   else{
-  for(i=0;i<8;i++)
-  s->ns_per_sample[i]=0;
+      for(i=0;i<8;i++)
+      s->ns_per_sample[i]=0;
   }
 }
 static const MemoryRegionOps stm32_adc_ops = {
