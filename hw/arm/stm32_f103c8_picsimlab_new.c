@@ -31,33 +31,11 @@
 #include "hw/irq.h"
 #include "hw/arm/boot.h"
 
-#ifndef _WIN32
-#include<sys/types.h>
-#include<sys/socket.h>
-#include<sys/un.h>
-#include<netinet/in.h>
-#include<arpa/inet.h>
-#else
-#include<winsock2.h>
-#include<ws2tcpip.h>
-#define _TCP_
-#endif
-
-extern unsigned short ADC_values[31];
-
 typedef struct
 {
  Stm32 *stm32;
-
- qemu_irq pin_irq[49];
+ qemu_irq pin_irq[100];
  qemu_irq *pout_irq;
-
- int connected;
- int sockfd;
-
- QemuThread thread;
- //QemuMutex dat_lock;
-
  DeviceState *gpio_a;
  DeviceState *gpio_b;
  DeviceState *gpio_c;
@@ -65,127 +43,42 @@ typedef struct
  DeviceState *uart1;
  DeviceState *uart2;
  DeviceState *uart3;
-} Stm32_f103c8;
+} Stm32_board;
+
+Stm32_board * s;
+
+extern unsigned short ADC_values[31];
+
+void (*picsimlab_write_pin)(int pin,int value) = NULL;
+
+void qemu_picsimlab_register(void (*picsimlab_write_pin_)(int pin,int value))
+{
+  picsimlab_write_pin = picsimlab_write_pin_;
+}
+
+void qemu_picsimlab_set_pin(int pin,int value)
+{
+   qemu_mutex_lock_iothread ();
+   if (value){
+      qemu_irq_raise (s->pin_irq[pin]);
+   }
+   else{
+      qemu_irq_lower (s->pin_irq[pin]);
+   }
+   qemu_mutex_unlock_iothread ();
+}
+
+void qemu_picsimlab_set_apin(int chn,int value)
+{
+   ADC_values[chn] = value;
+}
 
 static void
 pout_irq_handler(void *opaque, int n, int level)
 {
- Stm32_f103c8 *s = (Stm32_f103c8 *) opaque;
- char val;
-
- switch (level)
-  {
-  case 0:
-   if (s->connected)
-    {
-     val = (0x7F & n);
-     //qemu_mutex_lock (&s->dat_lock);
-     if (send (s->sockfd, &val, 1, 0) != 1)
-      {
-       if (errno != EINTR)
-        {
-         printf ("send error : %s \n", strerror (errno));
-         exit (1);
-        }
-      }
-     //qemu_mutex_unlock (&s->dat_lock);
-    }
-   break;
-  case 1:
-   if (s->connected)
-    {
-     val = (0x7F & n) | 0x80;
-     //qemu_mutex_lock (&s->dat_lock);
-     if (send (s->sockfd, &val, 1, 0) != 1)
-      {
-       if (errno != EINTR)
-        {
-         printf ("send error : %s \n", strerror (errno));
-         exit (1);
-        }
-      }
-     //qemu_mutex_unlock (&s->dat_lock);
-    }
-   break;
-  }
+   (*picsimlab_write_pin)(n,level);
 }
 
-static void *
-remote_gpio_thread(void * arg)
-{
- Stm32_f103c8 *s = (Stm32_f103c8 *) arg;
-#ifdef _TCP_
- struct sockaddr_in serv;
-#else
- struct sockaddr_un serv;
-#endif
- unsigned char buff;
- int n;
-
-
-#ifdef _TCP_
- if ((s->sockfd = socket (PF_INET, SOCK_STREAM, 0)) < 0)
-  {
-   printf ("socket error : %s \n", strerror (errno));
-   exit (1);
-  }
-
- memset (&serv, 0, sizeof (serv));
- serv.sin_family = AF_INET;
- serv.sin_addr.s_addr = inet_addr ("127.0.0.1");
- serv.sin_port = htons (2200);
-#else
- if ((s->sockfd = socket (PF_UNIX, SOCK_STREAM, 0)) < 0)
-  {
-   printf ("socket error : %s \n", strerror (errno));
-   exit (1);
-  }
-
- memset (&serv, 0, sizeof (serv));
- serv.sun_family = AF_UNIX;
- serv.sun_path[0] = 0;
- strncpy (serv.sun_path + 1, "picsimlab_qemu", sizeof (serv.sun_path) - 2);
-#endif
-
- n = 0;
- while (connect (s->sockfd, (struct sockaddr *) & serv, sizeof (serv)) < 0)
-  {
-   printf ("connect error : %s \n", strerror (errno));
-   sleep (1);
-   if (n > 5)exit (-1);
-   n++;
-  }
-
- s->connected = 1;
-
- while (1)
-  {
-   //qemu_mutex_lock (&s->dat_lock);
-   if ((recv (s->sockfd, & buff, 1, 0)) > 0)
-    {
-     qemu_mutex_lock_iothread ();
-     if (buff & 0x40)//analog
-      {
-       recv (s->sockfd, (unsigned char *) &ADC_values[buff & 0x1F], 2, 0);
-      }
-     else//digital
-      {
-       if (buff & 0x80)
-        {
-         qemu_irq_raise (s->pin_irq[buff & 0x7F]);
-        }
-       else
-        {
-         qemu_irq_lower (s->pin_irq[buff & 0x7F]);
-        }
-      }
-     qemu_mutex_unlock_iothread ();
-    }
-   //qemu_mutex_unlock (&s->dat_lock);
-  }
-
- return NULL;
-}
 
 #define FLASH_SIZE 0x00020000
 #define RAM_SIZE 0x00005000
@@ -195,14 +88,11 @@ remote_gpio_thread(void * arg)
 static void
 stm32_f103c8_picsimlab_init(MachineState *machine)
 {
- Stm32_f103c8 *s;
+
  Clock *sysclk;
 
- s = (Stm32_f103c8 *) g_malloc0 (sizeof (Stm32_f103c8));
+ s = (Stm32_board *) g_malloc0 (sizeof (Stm32_board));
 
- s->connected = 0;
- s->sockfd = -1;
- 
  sysclk = clock_new(OBJECT(machine), "SYSCLK");
  clock_set_hz(sysclk, SYSCLK_FRQ);
  stm32_init (FLASH_SIZE,
@@ -227,7 +117,7 @@ stm32_f103c8_picsimlab_init(MachineState *machine)
  assert (s->uart1);
  assert (s->uart3);
 
- s->pout_irq = qemu_allocate_irqs (pout_irq_handler, s, 49);
+ s->pout_irq = qemu_allocate_irqs (pout_irq_handler, NULL, 49);
 
  //0
  //VBAT
@@ -337,10 +227,7 @@ stm32_f103c8_picsimlab_init(MachineState *machine)
                      serial_hd(2),
                      STM32_USART3_NO_REMAP);
 
- //qemu_mutex_init (&s->dat_lock);
- qemu_thread_create (&s->thread, "remote_gpio", remote_gpio_thread, s, QEMU_THREAD_JOINABLE);
-
-armv7m_load_kernel(ARM_CPU(first_cpu),
+ armv7m_load_kernel(ARM_CPU(first_cpu),
                        machine->kernel_filename,
                        FLASH_SIZE);
 }
@@ -353,20 +240,6 @@ static void stm32_f103c8_picsimlab_machine_init(MachineClass *mc)
     mc->ignore_memory_transaction_failures = true;
 }
 
-DEFINE_MACHINE("stm32-f103c8-picsimlab", stm32_f103c8_picsimlab_machine_init)
+DEFINE_MACHINE("stm32-f103c8-picsimlab-new", stm32_f103c8_picsimlab_machine_init)
 
-#if 0
-static QEMUMachine stm32_f103c8_picsimlab_machine = {
- .name = "stm32-f103c8-picsimlab",
- .desc = "STM32F103C8 (Blue Pill) Dev Board (PICSimLab)",
- .init = stm32_f103c8_picsimlab_init,
-};
 
-static void
-stm32_f103c8_picsimlab_machine_init(void)
-{
- qemu_register_machine (&stm32_f103c8_picsimlab_machine);
-}
-
-machine_init(stm32_f103c8_picsimlab_machine_init);
-#endif
