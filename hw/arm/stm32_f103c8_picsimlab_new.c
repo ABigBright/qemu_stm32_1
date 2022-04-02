@@ -48,6 +48,10 @@ typedef struct
 Stm32_board * s;
 
 extern unsigned short ADC_values[31];
+//prototypes
+void qemu_picsimlab_register(void (*picsimlab_write_pin_)(int pin,int value));
+void qemu_picsimlab_set_apin(int chn,int value);
+void qemu_picsimlab_set_pin(int pin,int value);
 
 void (*picsimlab_write_pin)(int pin,int value) = NULL;
 

@@ -34,8 +34,8 @@ struct STM32F103State {
     /*< public >*/
     char *cpu_type;
     char *kernel_file;
-    ram_addr_t flash_size;
-    ram_addr_t ram_size;
+    uint64_t /*ram_addr_t*/ flash_size;
+    uint64_t /*ram_addr_t*/ ram_size;
     uint32_t osc_freq;
     uint32_t osc32_freq;
 
@@ -295,14 +295,14 @@ static void stm32_create_dac_dev(
     stm32_init_periph(dac_dev, periph, addr, irq);
     
 }
-
+/*
 static uint64_t kernel_load_translate_fn(void *opaque, uint64_t from_addr) {
     if (from_addr == STM32_FLASH_ADDR_START) {
         return 0x00000000;
     }
     return from_addr;
 }
-
+*/
 static void stm32f103_soc_initfn(Object *obj)
 {
     STM32F103State *s = STM32F103_SOC(obj);
@@ -362,7 +362,7 @@ static void stm32f103_soc_realize(DeviceState *dev_soc, Error **errp)
     Object *stm32_container = container_get(qdev_get_machine(), "/stm32");
   
     MemoryRegion *sram = g_new(MemoryRegion, 1);
-    MemoryRegion *flash = g_new(MemoryRegion, 1);
+    //MemoryRegion *flash = g_new(MemoryRegion, 1);
     
 /*
     pic = armv7m_translated_init(

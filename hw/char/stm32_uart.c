@@ -362,7 +362,9 @@ static void stm32_uart_tx_timer_expire(void *opaque) {
     stm32_uart_tx_complete(s);
 }
 
+
 /* DMA tx delay */
+/*
 static void stm32_uart_tx_dma_timer_expire(void *opaque) {
     Stm32Uart *s = (Stm32Uart *)opaque;
     uint64_t curr_time = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
@@ -377,7 +379,7 @@ static void stm32_uart_tx_dma_timer_expire(void *opaque) {
     }
 
 }
-
+*/
 
 
 

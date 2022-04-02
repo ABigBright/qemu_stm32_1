@@ -749,13 +749,13 @@ static void stm32_rcc_hclk_upd_irq_handler(void *opaque, int n, int level)
 {
     Stm32Rcc *s = (Stm32Rcc *)opaque;
     int system_clock_scale;
-    uint32_t hclk_freq, ext_ref_freq;
+    uint32_t hclk_freq;//, ext_ref_freq;
 
     hclk_freq = clktree_get_output_freq(s->HCLK);
 
     /* Only update the scales if the frequency is not zero. */
     if(hclk_freq > 0) {
-        ext_ref_freq = hclk_freq / 8;
+        //ext_ref_freq = hclk_freq / 8;
 
         /* Update the scales - these are the ratio of QEMU clock ticks
          * (which is an unchanging number independent of the CPU frequency) to
