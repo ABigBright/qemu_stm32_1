@@ -407,7 +407,7 @@ static void pollfds_poll(GArray *pollfds, int nfds, fd_set *rfds,
 
 static int os_host_main_loop_wait(int64_t timeout)
 {
-    GMainContext *context = g_main_context_default();
+    GMainContext *context = g_main_context_default_l;
     GPollFD poll_fds[1024 * 2]; /* this is probably overkill */
     int select_ret = 0;
     int g_poll_ret, ret, i, n_poll_fds;
