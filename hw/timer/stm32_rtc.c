@@ -107,9 +107,11 @@ static void stm32_rtc_clk_irq_handler(void *opaque, int n, int level)
     Stm32Rtc *s=(Stm32Rtc*)opaque;        
     s->freq=stm32_rcc_get_periph_freq(s->stm32_rcc,s->periph);
     if(s->freq){
-    ptimer_set_freq(s->ptimer,s->freq);
-    ptimer_set_count(s->ptimer,s->prescaler+1);
-    ptimer_run(s->ptimer, 1);
+        ptimer_transaction_begin(s->ptimer);
+        ptimer_set_freq(s->ptimer,s->freq);
+        ptimer_set_count(s->ptimer,s->prescaler+1);
+        ptimer_run(s->ptimer, 1);
+        ptimer_transaction_commit(s->ptimer);
     }    
     
 }
