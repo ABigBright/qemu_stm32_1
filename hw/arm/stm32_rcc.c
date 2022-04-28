@@ -770,9 +770,9 @@ static void stm32_rcc_hclk_upd_irq_handler(void *opaque, int n, int level)
 #ifdef DEBUG_STM32_RCC
     DPRINTF("Cortex SYSTICK frequency set to %lu Hz (scale set to %d).\n",
                 (unsigned long)hclk_freq, system_clock_scale);
-    DPRINTF("Cortex SYSTICK ext ref frequency set to %lu Hz "
-              "(scale set to %d).\n",
-              (unsigned long)ext_ref_freq, external_ref_clock_scale);
+    //DPRINTF("Cortex SYSTICK ext ref frequency set to %lu Hz "
+    //          "(scale set to %d).\n",
+    //          (unsigned long)ext_ref_freq, external_ref_clock_scale);
 #endif
 }
 

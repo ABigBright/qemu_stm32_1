@@ -506,7 +506,7 @@ void main_loop_poll_remove_notifier(Notifier *notify)
     notifier_remove(notify);
 }
 
-void main_loop_wait(int64_t timeout)
+void main_loop_wait(int nonblocking)
 {
     MainLoopPoll mlpoll = {
         .state = MAIN_LOOP_POLL_FILL,
@@ -516,8 +516,8 @@ void main_loop_wait(int64_t timeout)
     int ret;
     int64_t timeout_ns;
 
-    if (timeout) {
-        mlpoll.timeout = timeout;
+    if (nonblocking) {
+        mlpoll.timeout = 0;
     }
 
     /* poll any events */

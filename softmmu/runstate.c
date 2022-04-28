@@ -662,7 +662,7 @@ void qemu_system_debug_request(void)
     qemu_notify_event();
 }
 
-bool main_loop_should_exit(void)
+static bool main_loop_should_exit(void)
 {
     RunState r;
     ShutdownCause request;

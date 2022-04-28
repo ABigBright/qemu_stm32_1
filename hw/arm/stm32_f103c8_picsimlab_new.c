@@ -62,14 +62,14 @@ void qemu_picsimlab_register(void (*picsimlab_write_pin_)(int pin,int value))
 
 void qemu_picsimlab_set_pin(int pin,int value)
 {
-   qemu_mutex_lock_iothread ();
+   //qemu_mutex_lock_iothread ();
    if (value){
       qemu_irq_raise (s->pin_irq[pin]);
    }
    else{
       qemu_irq_lower (s->pin_irq[pin]);
    }
-   qemu_mutex_unlock_iothread ();
+   //qemu_mutex_unlock_iothread ();
 }
 
 void qemu_picsimlab_set_apin(int chn,int value)
