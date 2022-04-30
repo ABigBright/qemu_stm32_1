@@ -763,8 +763,8 @@ static void stm32_rcc_hclk_upd_irq_handler(void *opaque, int n, int level)
          */
         system_clock_scale = NANOSECONDS_PER_SECOND / hclk_freq;
         //external_ref_clock_scale = NANOSECONDS_PER_SECOND / ext_ref_freq;
-        clock_set_ns(s->sysclk, system_clock_scale);
-        //clock_propagate(s->sysclk);
+        clock_set_ns(s->sysclk->source, system_clock_scale);
+        clock_propagate(s->sysclk->source);  
     }
 
 #ifdef DEBUG_STM32_RCC
