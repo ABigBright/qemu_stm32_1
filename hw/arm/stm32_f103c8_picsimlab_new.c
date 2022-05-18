@@ -47,11 +47,29 @@ typedef struct
 
 Stm32_board * s;
 
+
 extern unsigned short ADC_values[31];
 //prototypes
 void qemu_picsimlab_register(void (*picsimlab_write_pin_)(int pin,int value));
 void qemu_picsimlab_set_apin(int chn,int value);
 void qemu_picsimlab_set_pin(int pin,int value);
+uint32_t * qemu_picsimlab_get_strap(void);
+uint32_t  qemu_picsimlab_get_TIOCM(void);
+
+uint32_t * qemu_picsimlab_get_strap(void)
+{
+  return NULL; //TODO add support to change boot mode 
+}
+
+uint32_t qemu_picsimlab_get_TIOCM(void)
+{
+   //ESP32UARTState *s = ESP32_UART(&(global_s->uart[0]));
+
+   uint32_t state=0;
+   //qemu_chr_fe_ioctl(&s->chr, CHR_IOCTL_SERIAL_GET_TIOCM, &state);
+
+   return state;
+}
 
 void (*picsimlab_write_pin)(int pin,int value) = NULL;
 
