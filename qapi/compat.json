@@ -1,5 +1,4 @@
 # -*- Mode: Python -*-
-# vim: filetype=python
 
 ##
 # = Compatibility policy
@@ -41,7 +40,7 @@
 #
 # Limitation: covers only syntactic aspects of QMP, i.e. stuff tagged
 # with feature 'deprecated'.  We may want to extend it to cover
-# semantic aspects and CLI.
+# semantic aspects, CLI, and experimental features.
 #
 # Limitation: deprecated-output policy @hide is not implemented for
 # enumeration values.  They behave the same as with policy @accept.

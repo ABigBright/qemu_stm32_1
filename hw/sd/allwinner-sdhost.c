@@ -311,8 +311,7 @@ static uint32_t allwinner_sdhost_process_desc(AwSdHostState *s,
     uint8_t buf[1024];
 
     /* Read descriptor */
-    dma_memory_read(&s->dma_as, desc_addr, desc, sizeof(*desc),
-                    MEMTXATTRS_UNSPECIFIED);
+    dma_memory_read(&s->dma_as, desc_addr, desc, sizeof(*desc));
     if (desc->size == 0) {
         desc->size = klass->max_desc_size;
     } else if (desc->size > klass->max_desc_size) {
@@ -338,24 +337,23 @@ static uint32_t allwinner_sdhost_process_desc(AwSdHostState *s,
         /* Write to SD bus */
         if (is_write) {
             dma_memory_read(&s->dma_as,
-                            (desc->addr & DESC_SIZE_MASK) + num_done, buf,
-                            buf_bytes, MEMTXATTRS_UNSPECIFIED);
+                            (desc->addr & DESC_SIZE_MASK) + num_done,
+                            buf, buf_bytes);
             sdbus_write_data(&s->sdbus, buf, buf_bytes);
 
         /* Read from SD bus */
         } else {
             sdbus_read_data(&s->sdbus, buf, buf_bytes);
             dma_memory_write(&s->dma_as,
-                             (desc->addr & DESC_SIZE_MASK) + num_done, buf,
-                             buf_bytes, MEMTXATTRS_UNSPECIFIED);
+                             (desc->addr & DESC_SIZE_MASK) + num_done,
+                             buf, buf_bytes);
         }
         num_done += buf_bytes;
     }
 
     /* Clear hold flag and flush descriptor */
     desc->status &= ~DESC_STATUS_HOLD;
-    dma_memory_write(&s->dma_as, desc_addr, desc, sizeof(*desc),
-                     MEMTXATTRS_UNSPECIFIED);
+    dma_memory_write(&s->dma_as, desc_addr, desc, sizeof(*desc));
 
     return num_done;
 }
@@ -835,7 +833,7 @@ static void allwinner_sdhost_sun5i_class_init(ObjectClass *klass, void *data)
     sc->max_desc_size = 64 * KiB;
 }
 
-static const TypeInfo allwinner_sdhost_info = {
+static TypeInfo allwinner_sdhost_info = {
     .name          = TYPE_AW_SDHOST,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_init = allwinner_sdhost_init,

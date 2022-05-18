@@ -62,6 +62,7 @@ typedef struct target_sigaltstack {
 #define TARGET_SA_SIGINFO       0x00000040
 
 #define TARGET_MINSIGSTKSZ	4096
+#define TARGET_SIGSTKSZ		16384
 
 /* From <asm/gentrap.h>.  */
 #define TARGET_GEN_INTOVF      -1      /* integer overflow */

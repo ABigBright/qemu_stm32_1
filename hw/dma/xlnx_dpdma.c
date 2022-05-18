@@ -652,7 +652,7 @@ size_t xlnx_dpdma_start_operation(XlnxDPDMAState *s, uint8_t channel,
         }
 
         if (dma_memory_read(&address_space_memory, desc_addr, &desc,
-                            sizeof(DPDMADescriptor), MEMTXATTRS_UNSPECIFIED)) {
+                            sizeof(DPDMADescriptor))) {
             s->registers[DPDMA_EISR] |= ((1 << 1) << channel);
             xlnx_dpdma_update_irq(s);
             s->operation_finished[channel] = true;
@@ -708,8 +708,7 @@ size_t xlnx_dpdma_start_operation(XlnxDPDMAState *s, uint8_t channel,
                     if (dma_memory_read(&address_space_memory,
                                         source_addr[0],
                                         &s->data[channel][ptr],
-                                        line_size,
-                                        MEMTXATTRS_UNSPECIFIED)) {
+                                        line_size)) {
                         s->registers[DPDMA_ISR] |= ((1 << 12) << channel);
                         xlnx_dpdma_update_irq(s);
                         DPRINTF("Can't get data.\n");
@@ -737,8 +736,7 @@ size_t xlnx_dpdma_start_operation(XlnxDPDMAState *s, uint8_t channel,
                     if (dma_memory_read(&address_space_memory,
                                         source_addr[frag],
                                         &(s->data[channel][ptr]),
-                                        fragment_len,
-                                        MEMTXATTRS_UNSPECIFIED)) {
+                                        fragment_len)) {
                         s->registers[DPDMA_ISR] |= ((1 << 12) << channel);
                         xlnx_dpdma_update_irq(s);
                         DPRINTF("Can't get data.\n");
@@ -756,7 +754,7 @@ size_t xlnx_dpdma_start_operation(XlnxDPDMAState *s, uint8_t channel,
             DPRINTF("update the descriptor with the done flag set.\n");
             xlnx_dpdma_desc_set_done(&desc);
             dma_memory_write(&address_space_memory, desc_addr, &desc,
-                             sizeof(DPDMADescriptor), MEMTXATTRS_UNSPECIFIED);
+                             sizeof(DPDMADescriptor));
         }
 
         if (xlnx_dpdma_desc_completion_interrupt(&desc)) {

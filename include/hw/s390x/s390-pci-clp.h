@@ -163,8 +163,7 @@ typedef struct ClpRspQueryPciGrp {
     uint8_t fr;
     uint16_t maxstbl;
     uint16_t mui;
-    uint8_t dtsm;
-    uint8_t reserved3[7];
+    uint64_t reserved3;
     uint64_t dasm; /* dma address space mask */
     uint64_t msia; /* MSI address */
     uint64_t reserved4;

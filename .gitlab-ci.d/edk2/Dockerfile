@@ -3,7 +3,7 @@
 #
 FROM ubuntu:16.04
 
-MAINTAINER Philippe Mathieu-Daudé <f4bug@amsat.org>
+MAINTAINER Philippe Mathieu-Daudé <philmd@redhat.com>
 
 # Install packages required to build EDK2
 RUN apt update \

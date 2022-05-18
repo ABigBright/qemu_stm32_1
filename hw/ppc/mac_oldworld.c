@@ -423,8 +423,7 @@ static void heathrow_class_init(ObjectClass *oc, void *data)
     mc->desc = "Heathrow based PowerMAC";
     mc->init = ppc_heathrow_init;
     mc->block_default_type = IF_IDE;
-    /* SMP is not supported currently */
-    mc->max_cpus = 1;
+    mc->max_cpus = MAX_CPUS;
 #ifndef TARGET_PPC64
     mc->is_default = true;
 #endif

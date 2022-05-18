@@ -581,8 +581,7 @@ static void core99_machine_class_init(ObjectClass *oc, void *data)
     mc->desc = "Mac99 based PowerMAC";
     mc->init = ppc_core99_init;
     mc->block_default_type = IF_IDE;
-    /* SMP is not supported currently */
-    mc->max_cpus = 1;
+    mc->max_cpus = MAX_CPUS;
     mc->default_boot_order = "cd";
     mc->default_display = "std";
     mc->kvm_type = core99_kvm_type;

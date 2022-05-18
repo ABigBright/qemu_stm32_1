@@ -43,7 +43,6 @@ struct SpikeState {
 
 enum {
     SPIKE_MROM,
-    SPIKE_HTIF,
     SPIKE_CLINT,
     SPIKE_DRAM
 };

@@ -255,8 +255,13 @@ static void ibm_40p_init(MachineState *machine)
         exit(1);
     }
 
-    /* Set time-base frequency to 100 Mhz */
-    cpu_ppc_tb_init(env, 100UL * 1000UL * 1000UL);
+    if (env->flags & POWERPC_FLAG_RTC_CLK) {
+        /* POWER / PowerPC 601 RTC clock frequency is 7.8125 MHz */
+        cpu_ppc_tb_init(env, 7812500UL);
+    } else {
+        /* Set time-base frequency to 100 Mhz */
+        cpu_ppc_tb_init(env, 100UL * 1000UL * 1000UL);
+    }
     qemu_register_reset(ppc_prep_reset, cpu);
 
     /* PCI host */

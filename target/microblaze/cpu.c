@@ -22,7 +22,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/log.h"
 #include "qapi/error.h"
 #include "cpu.h"
 #include "qemu/module.h"

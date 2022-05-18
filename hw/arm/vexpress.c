@@ -23,6 +23,7 @@
 
 #include "qemu/osdep.h"
 #include "qapi/error.h"
+#include "qemu-common.h"
 #include "qemu/datadir.h"
 #include "cpu.h"
 #include "hw/sysbus.h"
@@ -624,7 +625,7 @@ static void vexpress_common_init(MachineState *machine)
                           qdev_get_gpio_in(sysctl, ARM_SYSCTL_GPIO_MMC_WPROT));
     qdev_connect_gpio_out_named(dev, "card-inserted", 0,
                           qdev_get_gpio_in(sysctl, ARM_SYSCTL_GPIO_MMC_CARDIN));
-    dinfo = drive_get(IF_SD, 0, 0);
+    dinfo = drive_get_next(IF_SD);
     if (dinfo) {
         DeviceState *card;
 
@@ -656,7 +657,7 @@ static void vexpress_common_init(MachineState *machine)
 
     sysbus_create_simple("pl111", map[VE_CLCD], pic[14]);
 
-    dinfo = drive_get(IF_PFLASH, 0, 0);
+    dinfo = drive_get_next(IF_PFLASH);
     pflash0 = ve_pflash_cfi01_register(map[VE_NORFLASH0], "vexpress.flash0",
                                        dinfo);
     if (!pflash0) {
@@ -672,7 +673,7 @@ static void vexpress_common_init(MachineState *machine)
         memory_region_add_subregion(sysmem, map[VE_NORFLASHALIAS], flashalias);
     }
 
-    dinfo = drive_get(IF_PFLASH, 0, 1);
+    dinfo = drive_get_next(IF_PFLASH);
     if (!ve_pflash_cfi01_register(map[VE_NORFLASH1], "vexpress.flash1",
                                   dinfo)) {
         error_report("vexpress: error registering flash 1");
@@ -708,6 +709,7 @@ static void vexpress_common_init(MachineState *machine)
     }
 
     daughterboard->bootinfo.ram_size = machine->ram_size;
+    daughterboard->bootinfo.nb_cpus = machine->smp.cpus;
     daughterboard->bootinfo.board_id = VEXPRESS_BOARD_ID;
     daughterboard->bootinfo.loader_start = daughterboard->loader_start;
     daughterboard->bootinfo.smp_loader_start = map[VE_SRAM];

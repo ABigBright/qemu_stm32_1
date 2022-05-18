@@ -18,8 +18,6 @@
 #ifndef HEXAGON_INTERNAL_H
 #define HEXAGON_INTERNAL_H
 
-#include "qemu/log.h"
-
 /*
  * Change HEX_DEBUG to 1 to turn on debugging output
  */

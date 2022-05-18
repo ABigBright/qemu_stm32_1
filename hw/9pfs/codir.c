@@ -143,7 +143,8 @@ static int do_readdir_many(V9fsPDU *pdu, V9fsFidState *fidp,
         } else {
             e = e->next = g_malloc0(sizeof(V9fsDirEnt));
         }
-        e->dent = qemu_dirent_dup(dent);
+        e->dent = g_malloc0(sizeof(struct dirent));
+        memcpy(e->dent, dent, sizeof(struct dirent));
 
         /* perform a full stat() for directory entry if requested by caller */
         if (dostat) {

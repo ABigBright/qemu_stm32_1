@@ -100,6 +100,7 @@ static int gArgc;
 static char **gArgv;
 static bool stretch_video;
 static NSTextField *pauseLabel;
+static NSArray * supportedImageFileTypes;
 
 static QemuSemaphore display_init_sem;
 static QemuSemaphore app_started_sem;
@@ -551,7 +552,7 @@ QemuCocoaView *cocoaView;
     info.width = frameSize.width;
     info.height = frameSize.height;
 
-    dpy_set_ui_info(dcl.con, &info, TRUE);
+    dpy_set_ui_info(dcl.con, &info);
 }
 
 - (void)viewDidMoveToWindow
@@ -969,27 +970,21 @@ QemuCocoaView *cocoaView;
              */
 
             /*
-             * We shouldn't have got a scroll event when deltaY and delta Y
-             * are zero, hence no harm in dropping the event
+             * When deltaY is zero, it means that this scrolling event was
+             * either horizontal, or so fine that it only appears in
+             * scrollingDeltaY. So we drop the event.
              */
-            if ([event deltaY] != 0 || [event deltaX] != 0) {
+            if ([event deltaY] != 0) {
             /* Determine if this is a scroll up or scroll down event */
-                if ([event deltaY] != 0) {
-                  buttons = ([event deltaY] > 0) ?
+                buttons = ([event deltaY] > 0) ?
                     INPUT_BUTTON_WHEEL_UP : INPUT_BUTTON_WHEEL_DOWN;
-                } else if ([event deltaX] != 0) {
-                  buttons = ([event deltaX] > 0) ?
-                    INPUT_BUTTON_WHEEL_LEFT : INPUT_BUTTON_WHEEL_RIGHT;
-                }
-
                 qemu_input_queue_btn(dcl.con, buttons, true);
                 qemu_input_event_sync();
                 qemu_input_queue_btn(dcl.con, buttons, false);
                 qemu_input_event_sync();
             }
-
             /*
-             * Since deltaX/deltaY also report scroll wheel events we prevent mouse
+             * Since deltaY also reports scroll wheel events we prevent mouse
              * movement code from executing.
              */
             mouse_event = false;
@@ -1167,6 +1162,10 @@ QemuCocoaView *cocoaView;
         [pauseLabel setTextColor: [NSColor blackColor]];
         [pauseLabel sizeToFit];
 
+        // set the supported image file types that can be opened
+        supportedImageFileTypes = [NSArray arrayWithObjects: @"img", @"iso", @"dmg",
+                                 @"qcow", @"qcow2", @"cloop", @"vmdk", @"cdr",
+                                  @"toast", nil];
         [self make_about_window];
     }
     return self;
@@ -1409,6 +1408,7 @@ QemuCocoaView *cocoaView;
     openPanel = [NSOpenPanel openPanel];
     [openPanel setCanChooseFiles: YES];
     [openPanel setAllowsMultipleSelection: NO];
+    [openPanel setAllowedFileTypes: supportedImageFileTypes];
     if([openPanel runModal] == NSModalResponseOK) {
         NSString * file = [[[openPanel URLs] objectAtIndex: 0] path];
         if(file == nil) {
@@ -1674,9 +1674,7 @@ static void create_initial_menus(void)
 /* Returns a name for a given console */
 static NSString * getConsoleName(QemuConsole * console)
 {
-    g_autofree char *label = qemu_console_get_label(console);
-
-    return [NSString stringWithUTF8String:label];
+    return [NSString stringWithFormat: @"%s", qemu_console_get_label(console)];
 }
 
 /* Add an entry to the View menu for each console */
@@ -1711,6 +1709,11 @@ static void addRemovableDevicesMenuItems(void)
 
     currentDevice = qmp_query_block(NULL);
     pointerToFree = currentDevice;
+    if(currentDevice == NULL) {
+        NSBeep();
+        QEMU_Alert(@"Failed to query for block devices!");
+        return;
+    }
 
     menu = [[[NSApp mainMenu] itemWithTitle:@"Machine"] submenu];
 
@@ -1805,12 +1808,14 @@ static void cocoa_clipboard_request(QemuClipboardInfo *info,
 
 static QemuClipboardPeer cbpeer = {
     .name = "cocoa",
-    .notifier = { .notify = cocoa_clipboard_notify },
+    .update = { .notify = cocoa_clipboard_notify },
     .request = cocoa_clipboard_request
 };
 
-static void cocoa_clipboard_update_info(QemuClipboardInfo *info)
+static void cocoa_clipboard_notify(Notifier *notifier, void *data)
 {
+    QemuClipboardInfo *info = data;
+
     if (info->owner == &cbpeer || info->selection != QEMU_CLIPBOARD_SELECTION_CLIPBOARD) {
         return;
     }
@@ -1824,20 +1829,6 @@ static void cocoa_clipboard_update_info(QemuClipboardInfo *info)
     }
 
     qemu_event_set(&cbevent);
-}
-
-static void cocoa_clipboard_notify(Notifier *notifier, void *data)
-{
-    QemuClipboardNotify *notify = data;
-
-    switch (notify->type) {
-    case QEMU_CLIPBOARD_UPDATE_INFO:
-        cocoa_clipboard_update_info(notify->info);
-        return;
-    case QEMU_CLIPBOARD_RESET_SERIAL:
-        /* ignore */
-        return;
-    }
 }
 
 static void cocoa_clipboard_request(QemuClipboardInfo *info,

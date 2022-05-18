@@ -9,6 +9,7 @@
  */
 
 #include "qemu/osdep.h"
+#include "qemu-common.h"
 #include "qapi/error.h"
 #include "hw/s390x/tod.h"
 #include "qemu/timer.h"
@@ -16,7 +17,6 @@
 #include "qemu/module.h"
 #include "cpu.h"
 #include "tcg/tcg_s390x.h"
-#include "sysemu/rtc.h"
 
 static void qemu_s390_tod_get(const S390TODState *td, S390TOD *tod,
                               Error **errp)
@@ -73,7 +73,7 @@ static void qemu_s390_tod_init(Object *obj)
     }
 }
 
-static const TypeInfo qemu_s390_tod_info = {
+static TypeInfo qemu_s390_tod_info = {
     .name = TYPE_QEMU_S390_TOD,
     .parent = TYPE_S390_TOD,
     .instance_size = sizeof(S390TODState),

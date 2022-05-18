@@ -37,9 +37,6 @@
 #include "hw/virtio/virtio.h"
 #include "hw/virtio/virtio-pci.h"
 
-GlobalProperty hw_compat_6_2[] = {};
-const size_t hw_compat_6_2_len = G_N_ELEMENTS(hw_compat_6_2);
-
 GlobalProperty hw_compat_6_1[] = {
     { "vhost-user-vsock-device", "seqpacket", "off" },
     { "nvme-ns", "shared", "off" },
@@ -745,12 +742,10 @@ static void machine_get_smp(Object *obj, Visitor *v, const char *name,
         .has_cpus = true, .cpus = ms->smp.cpus,
         .has_sockets = true, .sockets = ms->smp.sockets,
         .has_dies = true, .dies = ms->smp.dies,
-        .has_clusters = true, .clusters = ms->smp.clusters,
         .has_cores = true, .cores = ms->smp.cores,
         .has_threads = true, .threads = ms->smp.threads,
         .has_maxcpus = true, .maxcpus = ms->smp.max_cpus,
     };
-
     if (!visit_type_SMPConfiguration(v, name, &config, &error_abort)) {
         return;
     }
@@ -766,7 +761,7 @@ static void machine_set_smp(Object *obj, Visitor *v, const char *name,
         return;
     }
 
-    machine_parse_smp_config(ms, config, errp);
+    smp_parse(ms, config, errp);
 }
 
 static void machine_class_init(ObjectClass *oc, void *data)
@@ -937,7 +932,6 @@ static void machine_initfn(Object *obj)
     ms->smp.max_cpus = mc->default_cpus;
     ms->smp.sockets = 1;
     ms->smp.dies = 1;
-    ms->smp.clusters = 1;
     ms->smp.cores = 1;
     ms->smp.threads = 1;
 }
@@ -1091,7 +1085,7 @@ MemoryRegion *machine_consume_memdev(MachineState *machine,
 {
     MemoryRegion *ret = host_memory_backend_get_memory(backend);
 
-    if (host_memory_backend_is_mapped(backend)) {
+    if (memory_region_is_mapped(ret)) {
         error_report("memory backend %s can't be used multiple times.",
                      object_get_canonical_path_component(OBJECT(backend)));
         exit(EXIT_FAILURE);

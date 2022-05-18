@@ -233,7 +233,7 @@ static void atmega_realize(DeviceState *dev, Error **errp)
 
     /* CPU */
     object_initialize_child(OBJECT(dev), "cpu", &s->cpu, mc->cpu_type);
-    qdev_realize(DEVICE(&s->cpu), NULL, &error_abort);
+    object_property_set_bool(OBJECT(&s->cpu), "realized", true, &error_abort);
     cpudev = DEVICE(&s->cpu);
 
     /* SRAM */

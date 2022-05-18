@@ -20,7 +20,6 @@
 #include "chardev/char-fe.h"
 #include "qemu/iov.h"
 #include "qemu/sockets.h"
-#include "block/aio-wait.h"
 
 #define TYPE_FILTER_MIRROR "filter-mirror"
 typedef struct MirrorState MirrorState;
@@ -43,21 +42,20 @@ struct MirrorState {
     bool vnet_hdr;
 };
 
-typedef struct FilterSendCo {
-    MirrorState *s;
-    char *buf;
-    ssize_t size;
-    bool done;
-    int ret;
-} FilterSendCo;
-
-static int _filter_send(MirrorState *s,
-                       char *buf,
-                       ssize_t size)
+static int filter_send(MirrorState *s,
+                       const struct iovec *iov,
+                       int iovcnt)
 {
     NetFilterState *nf = NETFILTER(s);
     int ret = 0;
+    ssize_t size = 0;
     uint32_t len = 0;
+    char *buf;
+
+    size = iov_size(iov, iovcnt);
+    if (!size) {
+        return 0;
+    }
 
     len = htonl(size);
     ret = qemu_chr_fe_write_all(&s->chr_out, (uint8_t *)&len, sizeof(len));
@@ -82,7 +80,10 @@ static int _filter_send(MirrorState *s,
         }
     }
 
+    buf = g_malloc(size);
+    iov_to_buf(iov, iovcnt, 0, buf, size);
     ret = qemu_chr_fe_write_all(&s->chr_out, (uint8_t *)buf, size);
+    g_free(buf);
     if (ret != size) {
         goto err;
     }
@@ -91,47 +92,6 @@ static int _filter_send(MirrorState *s,
 
 err:
     return ret < 0 ? ret : -EIO;
-}
-
-static void coroutine_fn filter_send_co(void *opaque)
-{
-    FilterSendCo *data = opaque;
-
-    data->ret = _filter_send(data->s, data->buf, data->size);
-    data->done = true;
-    g_free(data->buf);
-    aio_wait_kick();
-}
-
-static int filter_send(MirrorState *s,
-                       const struct iovec *iov,
-                       int iovcnt)
-{
-    ssize_t size = iov_size(iov, iovcnt);
-    char *buf = NULL;
-
-    if (!size) {
-        return 0;
-    }
-
-    buf = g_malloc(size);
-    iov_to_buf(iov, iovcnt, 0, buf, size);
-
-    FilterSendCo data = {
-        .s = s,
-        .size = size,
-        .buf = buf,
-        .ret = 0,
-    };
-
-    Coroutine *co = qemu_coroutine_create(filter_send_co, &data);
-    qemu_coroutine_enter(co);
-
-    while (!data.done) {
-        aio_poll(qemu_get_aio_context(), true);
-    }
-
-    return data.ret;
 }
 
 static void redirector_to_filter(NetFilterState *nf,

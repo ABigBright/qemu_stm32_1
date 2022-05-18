@@ -166,6 +166,7 @@ Other binaries
 
 -  user mode (PowerPC)
 
+   * ``qemu-ppc64abi32`` TODO.
    * ``qemu-ppc64`` TODO.
    * ``qemu-ppc`` TODO.
 

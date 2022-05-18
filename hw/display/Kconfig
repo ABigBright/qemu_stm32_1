@@ -49,7 +49,7 @@ config VGA_ISA
     depends on ISA_BUS
     select VGA
 
-config VGA_MMIO
+config VGA_ISA_MM
     bool
     select VGA
 
@@ -134,3 +134,7 @@ config MACFB
     bool
     select FRAMEBUFFER
     depends on NUBUS
+
+config ST7789V
+    bool
+

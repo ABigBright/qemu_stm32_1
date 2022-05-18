@@ -254,8 +254,8 @@ vhost_user_gpu_handle_display(VhostUserGPU *g, VhostUserGpuMsg *msg)
             vhost_user_gpu_unblock(g);
             break;
         }
-        g->backend_blocked = true;
         dpy_gl_update(con, m->x, m->y, m->width, m->height);
+        g->backend_blocked = true;
         break;
     }
     case VHOST_USER_GPU_UPDATE: {

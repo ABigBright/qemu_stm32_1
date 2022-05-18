@@ -44,9 +44,6 @@
 # @json-cli: If present, the "-device" command line option supports JSON
 #            syntax with a structure identical to the arguments of this
 #            command.
-# @json-cli-hotplug: If present, the "-device" command line option supports JSON
-#                    syntax without the reference counting leak that broke
-#                    hot-unplug
 #
 # Notes:
 #
@@ -77,7 +74,7 @@
 { 'command': 'device_add',
   'data': {'driver': 'str', '*bus': 'str', '*id': 'str'},
   'gen': false, # so we can get the additional arguments
-  'features': ['json-cli', 'json-cli-hotplug'] }
+  'features': ['json-cli'] }
 
 ##
 # @device_del:

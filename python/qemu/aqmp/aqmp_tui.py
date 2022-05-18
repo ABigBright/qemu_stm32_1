@@ -35,8 +35,7 @@ from pygments import token as Token
 import urwid
 import urwid_readline
 
-from qemu.qmp import QEMUMonitorProtocol, QMPBadPortError
-
+from ..qmp import QEMUMonitorProtocol, QMPBadPortError
 from .error import ProtocolError
 from .message import DeserializationError, Message, UnexpectedTypeError
 from .protocol import ConnectError, Runstate

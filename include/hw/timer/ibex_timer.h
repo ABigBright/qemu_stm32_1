@@ -43,6 +43,7 @@ struct IbexTimerState {
     uint32_t timer_compare_upper0;
     uint32_t timer_intr_enable;
     uint32_t timer_intr_state;
+    uint32_t timer_intr_test;
 
     uint32_t timebase_freq;
 

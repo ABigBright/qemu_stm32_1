@@ -17,6 +17,7 @@
 #ifndef HW_I386_X86_H
 #define HW_I386_X86_H
 
+#include "qemu-common.h"
 #include "exec/hwaddr.h"
 #include "qemu/notify.h"
 

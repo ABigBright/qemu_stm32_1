@@ -117,10 +117,6 @@ virtio_gpu_gl_block(void *opaque, bool block)
         g->renderer_blocked--;
     }
     assert(g->renderer_blocked >= 0);
-
-    if (!block && g->renderer_blocked == 0) {
-        virtio_gpu_gl_flushed(g);
-    }
 }
 
 static int
@@ -147,6 +143,7 @@ static const GraphicHwOps virtio_gpu_ops = {
     .text_update = virtio_gpu_text_update,
     .ui_info = virtio_gpu_ui_info,
     .gl_block = virtio_gpu_gl_block,
+    .gl_flushed = virtio_gpu_gl_flushed,
 };
 
 bool

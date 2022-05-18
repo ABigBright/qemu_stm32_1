@@ -32,5 +32,5 @@ for prefix in x86_64-w64-mingw32- i686-w64-mingw32-; do
     install_qemu
     make installer
     make clean
-
 done
+

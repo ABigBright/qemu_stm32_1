@@ -20,7 +20,6 @@
 #include "qemu/osdep.h"
 #include "qemu-common.h"
 #include "qemu.h"
-#include "qemu/timer.h"
 #include "user-internals.h"
 #include "cpu_loop-common.h"
 #include "signal-common.h"
@@ -85,6 +84,17 @@ static void set_idt(int n, unsigned int dpl)
 }
 #endif
 
+static void gen_signal(CPUX86State *env, int sig, int code, abi_ptr addr)
+{
+    target_siginfo_t info = {
+        .si_signo = sig,
+        .si_code = code,
+        ._sifields._sigfault._addr = addr
+    };
+
+    queue_signal(env, info.si_signo, QEMU_SI_FAULT, &info);
+}
+
 #ifdef TARGET_X86_64
 static bool write_ok_or_segv(CPUX86State *env, abi_ptr addr, size_t len)
 {
@@ -97,7 +107,7 @@ static bool write_ok_or_segv(CPUX86State *env, abi_ptr addr, size_t len)
     }
 
     env->error_code = PG_ERROR_W_MASK | PG_ERROR_U_MASK;
-    force_sig_fault(TARGET_SIGSEGV, TARGET_SEGV_MAPERR, addr);
+    gen_signal(env, TARGET_SIGSEGV, TARGET_SEGV_MAPERR, addr);
     return false;
 }
 
@@ -170,8 +180,8 @@ static void emulate_vsyscall(CPUX86State *env)
     ret = do_syscall(env, syscall, env->regs[R_EDI], env->regs[R_ESI],
                      env->regs[R_EDX], env->regs[10], env->regs[8],
                      env->regs[9], 0, 0);
-    g_assert(ret != -QEMU_ERESTARTSYS);
-    g_assert(ret != -QEMU_ESIGRETURN);
+    g_assert(ret != -TARGET_ERESTARTSYS);
+    g_assert(ret != -TARGET_QEMU_ESIGRETURN);
     if (ret == -TARGET_EFAULT) {
         goto sigsegv;
     }
@@ -183,20 +193,10 @@ static void emulate_vsyscall(CPUX86State *env)
     return;
 
  sigsegv:
-    force_sig(TARGET_SIGSEGV);
+    /* Like force_sig(SIGSEGV).  */
+    gen_signal(env, TARGET_SIGSEGV, TARGET_SI_KERNEL, 0);
 }
 #endif
-
-static bool maybe_handle_vm86_trap(CPUX86State *env, int trapnr)
-{
-#ifndef TARGET_X86_64
-    if (env->eflags & VM_MASK) {
-        handle_vm86_trap(env, trapnr);
-        return true;
-    }
-#endif
-    return false;
-}
 
 void cpu_loop(CPUX86State *env)
 {
@@ -223,9 +223,9 @@ void cpu_loop(CPUX86State *env)
                              env->regs[R_EDI],
                              env->regs[R_EBP],
                              0, 0);
-            if (ret == -QEMU_ERESTARTSYS) {
+            if (ret == -TARGET_ERESTARTSYS) {
                 env->eip -= 2;
-            } else if (ret != -QEMU_ESIGRETURN) {
+            } else if (ret != -TARGET_QEMU_ESIGRETURN) {
                 env->regs[R_EAX] = ret;
             }
             break;
@@ -241,9 +241,9 @@ void cpu_loop(CPUX86State *env)
                              env->regs[8],
                              env->regs[9],
                              0, 0);
-            if (ret == -QEMU_ERESTARTSYS) {
+            if (ret == -TARGET_ERESTARTSYS) {
                 env->eip -= 2;
-            } else if (ret != -QEMU_ESIGRETURN) {
+            } else if (ret != -TARGET_QEMU_ESIGRETURN) {
                 env->regs[R_EAX] = ret;
             }
             break;
@@ -255,54 +255,65 @@ void cpu_loop(CPUX86State *env)
 #endif
         case EXCP0B_NOSEG:
         case EXCP0C_STACK:
-            force_sig(TARGET_SIGBUS);
+            gen_signal(env, TARGET_SIGBUS, TARGET_SI_KERNEL, 0);
             break;
         case EXCP0D_GPF:
             /* XXX: potential problem if ABI32 */
-            if (maybe_handle_vm86_trap(env, trapnr)) {
+#ifndef TARGET_X86_64
+            if (env->eflags & VM_MASK) {
+                handle_vm86_fault(env);
                 break;
             }
-            force_sig(TARGET_SIGSEGV);
+#endif
+            gen_signal(env, TARGET_SIGSEGV, TARGET_SI_KERNEL, 0);
             break;
         case EXCP0E_PAGE:
-            force_sig_fault(TARGET_SIGSEGV,
-                            (env->error_code & PG_ERROR_P_MASK ?
-                             TARGET_SEGV_ACCERR : TARGET_SEGV_MAPERR),
-                            env->cr[2]);
+            gen_signal(env, TARGET_SIGSEGV,
+                       (env->error_code & 1 ?
+                        TARGET_SEGV_ACCERR : TARGET_SEGV_MAPERR),
+                       env->cr[2]);
             break;
         case EXCP00_DIVZ:
-            if (maybe_handle_vm86_trap(env, trapnr)) {
+#ifndef TARGET_X86_64
+            if (env->eflags & VM_MASK) {
+                handle_vm86_trap(env, trapnr);
                 break;
             }
-            force_sig_fault(TARGET_SIGFPE, TARGET_FPE_INTDIV, env->eip);
+#endif
+            gen_signal(env, TARGET_SIGFPE, TARGET_FPE_INTDIV, env->eip);
             break;
         case EXCP01_DB:
-            if (maybe_handle_vm86_trap(env, trapnr)) {
-                break;
-            }
-            force_sig_fault(TARGET_SIGTRAP, TARGET_TRAP_BRKPT, env->eip);
-            break;
         case EXCP03_INT3:
-            if (maybe_handle_vm86_trap(env, trapnr)) {
+#ifndef TARGET_X86_64
+            if (env->eflags & VM_MASK) {
+                handle_vm86_trap(env, trapnr);
                 break;
             }
-            force_sig(TARGET_SIGTRAP);
+#endif
+            if (trapnr == EXCP01_DB) {
+                gen_signal(env, TARGET_SIGTRAP, TARGET_TRAP_BRKPT, env->eip);
+            } else {
+                gen_signal(env, TARGET_SIGTRAP, TARGET_SI_KERNEL, 0);
+            }
             break;
         case EXCP04_INTO:
         case EXCP05_BOUND:
-            if (maybe_handle_vm86_trap(env, trapnr)) {
+#ifndef TARGET_X86_64
+            if (env->eflags & VM_MASK) {
+                handle_vm86_trap(env, trapnr);
                 break;
             }
-            force_sig(TARGET_SIGSEGV);
+#endif
+            gen_signal(env, TARGET_SIGSEGV, TARGET_SI_KERNEL, 0);
             break;
         case EXCP06_ILLOP:
-            force_sig_fault(TARGET_SIGILL, TARGET_ILL_ILLOPN, env->eip);
+            gen_signal(env, TARGET_SIGILL, TARGET_ILL_ILLOPN, env->eip);
             break;
         case EXCP_INTERRUPT:
             /* just indicate that signals should be handled asap */
             break;
         case EXCP_DEBUG:
-            force_sig_fault(TARGET_SIGTRAP, TARGET_TRAP_BRKPT, env->eip);
+            gen_signal(env, TARGET_SIGTRAP, TARGET_TRAP_BRKPT, 0);
             break;
         case EXCP_ATOMIC:
             cpu_exec_step_atomic(cs);

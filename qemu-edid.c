@@ -10,8 +10,8 @@
 #include "hw/display/edid.h"
 
 static qemu_edid_info info = {
-    .prefx = 1280,
-    .prefy = 800,
+    .prefx = 1024,
+    .prefy = 768,
 };
 
 static void usage(FILE *out)

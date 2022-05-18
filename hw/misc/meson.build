@@ -84,10 +84,7 @@ softmmu_ss.add(when: 'CONFIG_RASPI', if_true: files(
 ))
 softmmu_ss.add(when: 'CONFIG_SLAVIO', if_true: files('slavio_misc.c'))
 softmmu_ss.add(when: 'CONFIG_ZYNQ', if_true: files('zynq_slcr.c'))
-softmmu_ss.add(when: 'CONFIG_XLNX_VERSAL', if_true: files(
-  'xlnx-versal-xramc.c',
-  'xlnx-versal-pmc-iou-slcr.c',
-))
+softmmu_ss.add(when: 'CONFIG_XLNX_VERSAL', if_true: files('xlnx-versal-xramc.c'))
 softmmu_ss.add(when: 'CONFIG_STM32F2XX_SYSCFG', if_true: files('stm32f2xx_syscfg.c'))
 softmmu_ss.add(when: 'CONFIG_STM32F4XX_SYSCFG', if_true: files('stm32f4xx_syscfg.c'))
 softmmu_ss.add(when: 'CONFIG_STM32F4XX_EXTI', if_true: files('stm32f4xx_exti.c'))
@@ -108,15 +105,35 @@ softmmu_ss.add(when: 'CONFIG_PVPANIC_PCI', if_true: files('pvpanic-pci.c'))
 softmmu_ss.add(when: 'CONFIG_AUX', if_true: files('auxbus.c'))
 softmmu_ss.add(when: 'CONFIG_ASPEED_SOC', if_true: files(
   'aspeed_hace.c',
-  'aspeed_i3c.c',
   'aspeed_lpc.c',
   'aspeed_scu.c',
-  'aspeed_sbc.c',
   'aspeed_sdmc.c',
   'aspeed_xdma.c'))
 
 softmmu_ss.add(when: 'CONFIG_MSF2', if_true: files('msf2-sysreg.c'))
 softmmu_ss.add(when: 'CONFIG_NRF51_SOC', if_true: files('nrf51_rng.c'))
+softmmu_ss.add(when: 'CONFIG_XTENSA_ESP32', if_true: files(
+  'esp32_crosscore_int.c',
+  'esp32_dport.c',
+  'esp32_rng.c',
+  'esp32_rsa.c',
+  'esp32_rtc_cntl.c',
+  'esp32_sha.c',
+  'esp32_flash_enc.c',
+  'ssi_psram.c',
+  'esp32_sens.c',
+  'esp32_ana.c',
+  'esp32_wifi.c',
+  'esp32_fe.c',
+  'esp32_ramdev.c',
+  'esp32_wifi_ap.c',
+  'esp32_wlan_packet.c'
+
+))
+
+if 'CONFIG_GCRYPT' in config_host
+  softmmu_ss.add(gcrypt)
+endif
 
 softmmu_ss.add(when: 'CONFIG_GRLIB', if_true: files('grlib_ahb_apb_pnp.c'))
 

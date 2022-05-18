@@ -36,7 +36,6 @@
 #include "qemu-version.h"
 #include "qemu/cutils.h"
 #include "qemu/help_option.h"
-#include "qemu/hw-version.h"
 #include "qemu/uuid.h"
 #include "sysemu/reset.h"
 #include "sysemu/runstate.h"
@@ -728,9 +727,6 @@ static QemuOptsList qemu_smp_opts = {
             .type = QEMU_OPT_NUMBER,
         }, {
             .name = "dies",
-            .type = QEMU_OPT_NUMBER,
-        }, {
-            .name = "clusters",
             .type = QEMU_OPT_NUMBER,
         }, {
             .name = "cores",
@@ -1944,7 +1940,7 @@ static void qemu_create_early_backends(void)
                      "for SDL, ignoring option");
     }
     if (dpy.has_window_close && !use_gtk && !use_sdl) {
-        error_report("window-close is only valid for GTK and SDL, "
+        error_report("-no-quit is only valid for GTK and SDL, "
                      "ignoring option");
     }
 
@@ -2687,7 +2683,6 @@ static void qemu_create_cli_devices(void)
     qemu_opts_foreach(qemu_find_opts("device"),
                       device_init_func, NULL, &error_fatal);
     QTAILQ_FOREACH(opt, &device_opts, next) {
-        DeviceState *dev;
         loc_push_restore(&opt->loc);
         /*
          * TODO Eventually we should call qmp_device_add() here to make sure it
@@ -2696,8 +2691,7 @@ static void qemu_create_cli_devices(void)
          * from the start, so call qdev_device_add_from_qdict() directly for
          * now.
          */
-        dev = qdev_device_add_from_qdict(opt->opts, true, &error_fatal);
-        object_unref(OBJECT(dev));
+        qdev_device_add_from_qdict(opt->opts, true, &error_fatal);
         loc_pop(&opt->loc);
     }
     rom_reset_order_override();
@@ -2892,9 +2886,7 @@ void qemu_init(int argc, char **argv, char **envp)
                     break;
                 }
             case QEMU_OPTION_drive:
-                opts = qemu_opts_parse_noisily(qemu_find_opts("drive"),
-                                               optarg, false);
-                if (opts == NULL) {
+                if (drive_def(optarg) == NULL) {
                     exit(1);
                 }
                 break;
@@ -3307,6 +3299,12 @@ void qemu_init(int argc, char **argv, char **envp)
                 ctrl_grab = 1;
                 warn_report("-ctrl-grab is deprecated, please use "
                             "-display sdl,grab-mod=rctrl instead.");
+                break;
+            case QEMU_OPTION_no_quit:
+                dpy.has_window_close = true;
+                dpy.window_close = false;
+                warn_report("-no-quit is deprecated, please use "
+                            "-display ...,window-close=off instead.");
                 break;
             case QEMU_OPTION_sdl:
                 warn_report("-sdl is deprecated, use -display sdl instead.");

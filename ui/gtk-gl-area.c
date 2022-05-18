@@ -101,6 +101,8 @@ void gd_gl_area_draw(VirtualConsole *vc)
         surface_gl_setup_viewport(vc->gfx.gls, vc->gfx.ds, ww, wh);
         surface_gl_render_texture(vc->gfx.gls, vc->gfx.ds);
     }
+
+    graphic_hw_gl_flushed(vc->gfx.dcl.con);
 }
 
 void gd_gl_area_update(DisplayChangeListener *dcl,
@@ -170,10 +172,10 @@ void gd_gl_area_switch(DisplayChangeListener *dcl,
     }
 }
 
-QEMUGLContext gd_gl_area_create_context(DisplayGLCtx *dgc,
+QEMUGLContext gd_gl_area_create_context(DisplayChangeListener *dcl,
                                         QEMUGLParams *params)
 {
-    VirtualConsole *vc = container_of(dgc, VirtualConsole, gfx.dgc);
+    VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
     GdkWindow *window;
     GdkGLContext *ctx;
     GError *err = NULL;
@@ -199,7 +201,7 @@ QEMUGLContext gd_gl_area_create_context(DisplayGLCtx *dgc,
     return ctx;
 }
 
-void gd_gl_area_destroy_context(DisplayGLCtx *dgc, QEMUGLContext ctx)
+void gd_gl_area_destroy_context(DisplayChangeListener *dcl, QEMUGLContext ctx)
 {
     /* FIXME */
 }
@@ -278,7 +280,7 @@ void gtk_gl_area_init(void)
     display_opengl = 1;
 }
 
-int gd_gl_area_make_current(DisplayGLCtx *dgc,
+int gd_gl_area_make_current(DisplayChangeListener *dcl,
                             QEMUGLContext ctx)
 {
     gdk_gl_context_make_current(ctx);

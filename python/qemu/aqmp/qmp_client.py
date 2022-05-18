@@ -20,7 +20,7 @@ from typing import (
     cast,
 )
 
-from .error import ProtocolError, QMPError
+from .error import AQMPError, ProtocolError
 from .events import Events
 from .message import Message
 from .models import ErrorResponse, Greeting
@@ -66,7 +66,7 @@ class NegotiationError(_WrappedProtocolError):
     """
 
 
-class ExecuteError(QMPError):
+class ExecuteError(AQMPError):
     """
     Exception raised by `QMPClient.execute()` on RPC failure.
 
@@ -87,7 +87,7 @@ class ExecuteError(QMPError):
         self.error_class: str = error_response.error.class_
 
 
-class ExecInterruptedError(QMPError):
+class ExecInterruptedError(AQMPError):
     """
     Exception raised by `execute()` (et al) when an RPC is interrupted.
 
@@ -292,9 +292,9 @@ class QMPClient(AsyncProtocol[Message], Events):
         """
         self.logger.debug("Negotiating capabilities ...")
 
-        arguments: Dict[str, List[str]] = {}
+        arguments: Dict[str, List[str]] = {'enable': []}
         if self._greeting and 'oob' in self._greeting.QMP.capabilities:
-            arguments.setdefault('enable', []).append('oob')
+            arguments['enable'].append('oob')
         msg = self.make_execute_msg('qmp_capabilities', arguments=arguments)
 
         # It's not safe to use execute() here, because the reader/writers
@@ -435,11 +435,7 @@ class QMPClient(AsyncProtocol[Message], Events):
             msg_id = msg['id']
 
         self._pending[msg_id] = asyncio.Queue(maxsize=1)
-        try:
-            await self._outgoing.put(msg)
-        except:
-            del self._pending[msg_id]
-            raise
+        await self._outgoing.put(msg)
 
         return msg_id
 
@@ -456,9 +452,9 @@ class QMPClient(AsyncProtocol[Message], Events):
             was lost, or some other problem.
         """
         queue = self._pending[msg_id]
+        result = await queue.get()
 
         try:
-            result = await queue.get()
             if isinstance(result, ExecInterruptedError):
                 raise result
             return result
@@ -641,7 +637,7 @@ class QMPClient(AsyncProtocol[Message], Events):
         sock = self._writer.transport.get_extra_info('socket')
 
         if sock.family != socket.AF_UNIX:
-            raise QMPError("Sending file descriptors requires a UNIX socket.")
+            raise AQMPError("Sending file descriptors requires a UNIX socket.")
 
         if not hasattr(sock, 'sendmsg'):
             # We need to void the warranty sticker.

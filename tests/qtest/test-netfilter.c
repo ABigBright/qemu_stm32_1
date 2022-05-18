@@ -178,6 +178,11 @@ int main(int argc, char **argv)
 {
     int ret;
     char *args;
+    const char *devstr = "e1000";
+
+    if (g_str_equal(qtest_get_arch(), "s390x")) {
+        devstr = "virtio-net-ccw";
+    }
 
     g_test_init(&argc, &argv, NULL);
     qtest_add_func("/netfilter/addremove_one", add_one_netfilter);
@@ -187,7 +192,8 @@ int main(int argc, char **argv)
     qtest_add_func("/netfilter/remove_netdev_multi",
                    remove_netdev_with_multi_netfilter);
 
-    args = g_strdup_printf("-nic user,id=qtest-bn0");
+    args = g_strdup_printf("-netdev user,id=qtest-bn0 "
+                           "-device %s,netdev=qtest-bn0", devstr);
     qtest_start(args);
     ret = g_test_run();
 

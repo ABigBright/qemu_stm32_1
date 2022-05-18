@@ -154,6 +154,17 @@ void virtio_blk_data_plane_destroy(VirtIOBlockDataPlane *s)
     g_free(s);
 }
 
+static bool virtio_blk_data_plane_handle_output(VirtIODevice *vdev,
+                                                VirtQueue *vq)
+{
+    VirtIOBlock *s = (VirtIOBlock *)vdev;
+
+    assert(s->dataplane);
+    assert(s->dataplane_started);
+
+    return virtio_blk_handle_vq(s, vq);
+}
+
 /* Context: QEMU global mutex held */
 int virtio_blk_data_plane_start(VirtIODevice *vdev)
 {
@@ -247,7 +258,8 @@ int virtio_blk_data_plane_start(VirtIODevice *vdev)
     for (i = 0; i < nvqs; i++) {
         VirtQueue *vq = virtio_get_queue(s->vdev, i);
 
-        virtio_queue_aio_attach_host_notifier(vq, s->ctx);
+        virtio_queue_aio_set_host_notifier_handler(vq, s->ctx,
+                virtio_blk_data_plane_handle_output);
     }
     aio_context_release(s->ctx);
     return 0;
@@ -290,7 +302,7 @@ static void virtio_blk_data_plane_stop_bh(void *opaque)
     for (i = 0; i < s->conf->num_queues; i++) {
         VirtQueue *vq = virtio_get_queue(s->vdev, i);
 
-        virtio_queue_aio_detach_host_notifier(vq, s->ctx);
+        virtio_queue_aio_set_host_notifier_handler(vq, s->ctx, NULL);
     }
 }
 

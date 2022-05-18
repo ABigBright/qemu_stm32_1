@@ -2,7 +2,6 @@
 #define HW_MCF_H
 /* Motorola ColdFire device prototypes.  */
 
-#include "exec/hwaddr.h"
 #include "target/m68k/cpu-qom.h"
 
 /* mcf_uart.c */

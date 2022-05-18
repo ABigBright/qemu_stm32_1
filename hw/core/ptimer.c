@@ -14,6 +14,7 @@
 #include "sysemu/cpu-timers.h"
 #include "sysemu/qtest.h"
 #include "block/aio.h"
+#include "sysemu/cpus.h"
 #include "hw/clock.h"
 
 #define DELTA_ADJUST     1

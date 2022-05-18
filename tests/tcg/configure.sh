@@ -64,9 +64,7 @@ fi
 : ${cross_cc_ppc="powerpc-linux-gnu-gcc"}
 : ${cross_cc_cflags_ppc="-m32"}
 : ${cross_cc_ppc64="powerpc64-linux-gnu-gcc"}
-: ${cross_cc_cflags_ppc64="-m64 -mbig"}
-: ${cross_cc_ppc64le="$cross_cc_ppc64"}
-: ${cross_cc_cflags_ppc64le="-m64 -mlittle"}
+: ${cross_cc_ppc64le="powerpc64le-linux-gnu-gcc"}
 : ${cross_cc_riscv64="riscv64-linux-gnu-gcc"}
 : ${cross_cc_s390x="s390x-linux-gnu-gcc"}
 : ${cross_cc_sh4="sh4-linux-gnu-gcc"}
@@ -97,7 +95,7 @@ for target in $target_list; do
     aarch64-*)
       # We don't have any bigendian build tools so we only use this for AArch64
       container_hosts="x86_64 aarch64"
-      container_image=debian-arm64-cross
+      container_image=debian-arm64-test-cross
       container_cross_cc=aarch64-linux-gnu-gcc-10
       ;;
     alpha-*)
@@ -167,7 +165,7 @@ for target in $target_list; do
       container_image=debian-nios2-cross
       container_cross_cc=nios2-linux-gnu-gcc
       ;;
-    ppc-*)
+    ppc-*|ppc64abi32-*)
       container_hosts=x86_64
       container_image=debian-powerpc-test-cross
       container_cross_cc=powerpc-linux-gnu-gcc-10
@@ -180,7 +178,7 @@ for target in $target_list; do
       ;;
     riscv64-*)
       container_hosts=x86_64
-      container_image=debian-riscv64-test-cross
+      container_image=debian-riscv64-cross
       container_cross_cc=riscv64-linux-gnu-gcc
       ;;
     s390x-*)
@@ -225,14 +223,8 @@ for target in $target_list; do
   echo "TARGET_NAME=$arch" >> $config_target_mak
   echo "target=$target" >> $config_target_mak
   case $target in
-    *-linux-user)
+    *-linux-user | *-bsd-user)
       echo "CONFIG_USER_ONLY=y" >> $config_target_mak
-      echo "CONFIG_LINUX_USER=y" >> $config_target_mak
-      echo "QEMU=$PWD/qemu-$arch" >> $config_target_mak
-      ;;
-    *-bsd-user)
-      echo "CONFIG_USER_ONLY=y" >> $config_target_mak
-      echo "CONFIG_BSD_USER=y" >> $config_target_mak
       echo "QEMU=$PWD/qemu-$arch" >> $config_target_mak
       ;;
     *-softmmu)
@@ -332,7 +324,7 @@ for target in $target_list; do
   elif test $got_cross_cc = no && test "$container" != no && \
           test -n "$container_image"; then
       for host in $container_hosts; do
-          if test "$host" = "$cpu"; then
+          if test "$host" = "$ARCH"; then
               echo "DOCKER_IMAGE=$container_image" >> $config_target_mak
               echo "DOCKER_CROSS_CC_GUEST=$container_cross_cc" >> \
                    $config_target_mak

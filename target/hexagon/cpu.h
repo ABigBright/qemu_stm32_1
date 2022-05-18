@@ -23,6 +23,7 @@ typedef struct CPUHexagonState CPUHexagonState;
 
 #include "fpu/softfloat-types.h"
 
+#include "qemu-common.h"
 #include "exec/cpu-defs.h"
 #include "hex_regs.h"
 #include "mmvec/mmvec.h"

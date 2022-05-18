@@ -23,6 +23,7 @@
  */
 
 #include "qemu/osdep.h"
+#include "qemu-common.h"
 #include "clients.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
@@ -32,7 +33,6 @@
 #include "qapi/visitor.h"
 #include "net/filter.h"
 #include "qom/object.h"
-#include "sysemu/rtc.h"
 
 typedef struct DumpState {
     int64_t start_ts;

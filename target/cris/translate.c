@@ -1047,7 +1047,7 @@ static void gen_load64(DisasContext *dc, TCGv_i64 dst, TCGv addr)
         cris_store_direct_jmp(dc);
     }
 
-    tcg_gen_qemu_ld_i64(dst, addr, mem_index, MO_TEUQ);
+    tcg_gen_qemu_ld_i64(dst, addr, mem_index, MO_TEQ);
 }
 
 static void gen_load(DisasContext *dc, TCGv dst, TCGv addr, 

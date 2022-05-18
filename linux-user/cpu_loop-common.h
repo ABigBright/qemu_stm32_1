@@ -21,7 +21,6 @@
 #define CPU_LOOP_COMMON_H
 
 #include "exec/log.h"
-#include "special-errno.h"
 
 #define EXCP_DUMP(env, fmt, ...)                                        \
 do {                                                                    \

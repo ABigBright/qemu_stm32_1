@@ -7,7 +7,6 @@
 
 #include "qemu/osdep.h"
 #include "qemu/cacheflush.h"
-#include "qemu/cacheinfo.h"
 #include "qemu/bitops.h"
 
 

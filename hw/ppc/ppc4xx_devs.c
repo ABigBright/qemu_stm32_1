@@ -35,7 +35,14 @@
 #include "exec/address-spaces.h"
 #include "qemu/error-report.h"
 #include "qapi/error.h"
-#include "trace.h"
+
+/*#define DEBUG_UIC*/
+
+#ifdef DEBUG_UIC
+#  define LOG_UIC(...) qemu_log_mask(CPU_LOG_INT, ## __VA_ARGS__)
+#else
+#  define LOG_UIC(...) do { } while (0)
+#endif
 
 static void ppc4xx_reset(void *opaque)
 {
@@ -130,9 +137,8 @@ static uint32_t sdram_bcr (hwaddr ram_base,
         bcr = 0x000C0000;
         break;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: invalid RAM size 0x%" HWADDR_PRIx "\n", __func__,
-                      ram_size);
+        printf("%s: invalid RAM size " TARGET_FMT_plx "\n", __func__,
+               ram_size);
         return 0x00000000;
     }
     bcr |= ram_base & 0xFF800000;
@@ -165,8 +171,10 @@ static void sdram_set_bcr(ppc4xx_sdram_t *sdram, int i,
 {
     if (sdram->bcr[i] & 0x00000001) {
         /* Unmap RAM */
-        trace_ppc4xx_sdram_unmap(sdram_base(sdram->bcr[i]),
-                                 sdram_size(sdram->bcr[i]));
+#ifdef DEBUG_SDRAM
+        printf("%s: unmap RAM area " TARGET_FMT_plx " " TARGET_FMT_lx "\n",
+               __func__, sdram_base(sdram->bcr[i]), sdram_size(sdram->bcr[i]));
+#endif
         memory_region_del_subregion(get_system_memory(),
                                     &sdram->containers[i]);
         memory_region_del_subregion(&sdram->containers[i],
@@ -175,7 +183,10 @@ static void sdram_set_bcr(ppc4xx_sdram_t *sdram, int i,
     }
     sdram->bcr[i] = bcr & 0xFFDEE001;
     if (enabled && (bcr & 0x00000001)) {
-        trace_ppc4xx_sdram_unmap(sdram_base(bcr), sdram_size(bcr));
+#ifdef DEBUG_SDRAM
+        printf("%s: Map RAM area " TARGET_FMT_plx " " TARGET_FMT_lx "\n",
+               __func__, sdram_base(bcr), sdram_size(bcr));
+#endif
         memory_region_init(&sdram->containers[i], NULL, "sdram-containers",
                            sdram_size(bcr));
         memory_region_add_subregion(&sdram->containers[i], 0,
@@ -205,8 +216,10 @@ static void sdram_unmap_bcr (ppc4xx_sdram_t *sdram)
     int i;
 
     for (i = 0; i < sdram->nbanks; i++) {
-        trace_ppc4xx_sdram_unmap(sdram_base(sdram->bcr[i]),
-                                 sdram_size(sdram->bcr[i]));
+#ifdef DEBUG_SDRAM
+        printf("%s: Unmap RAM area " TARGET_FMT_plx " " TARGET_FMT_lx "\n",
+               __func__, sdram_base(sdram->bcr[i]), sdram_size(sdram->bcr[i]));
+#endif
         memory_region_del_subregion(get_system_memory(),
                                     &sdram->ram_memories[i]);
     }
@@ -303,12 +316,16 @@ static void dcr_write_sdram (void *opaque, int dcrn, uint32_t val)
         case 0x20: /* SDRAM_CFG */
             val &= 0xFFE00000;
             if (!(sdram->cfg & 0x80000000) && (val & 0x80000000)) {
-                trace_ppc4xx_sdram_enable("enable");
+#ifdef DEBUG_SDRAM
+                printf("%s: enable SDRAM controller\n", __func__);
+#endif
                 /* validate all RAM mappings */
                 sdram_map_bcr(sdram);
                 sdram->status &= ~0x80000000;
             } else if ((sdram->cfg & 0x80000000) && !(val & 0x80000000)) {
-                trace_ppc4xx_sdram_enable("disable");
+#ifdef DEBUG_SDRAM
+                printf("%s: disable SDRAM controller\n", __func__);
+#endif
                 /* invalidate all RAM mappings */
                 sdram_unmap_bcr(sdram);
                 sdram->status |= 0x80000000;

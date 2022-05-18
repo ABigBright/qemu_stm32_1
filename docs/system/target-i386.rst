@@ -28,7 +28,6 @@ Architectural features
    i386/cpu
    i386/kvm-pv
    i386/sgx
-   i386/amd-memory-encryption
 
 .. _pcsys_005freq:
 

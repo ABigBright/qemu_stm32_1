@@ -9,7 +9,6 @@
 #include "qemu/osdep.h"
 #include "qemu/host-utils.h"
 #include "qemu/atomic.h"
-#include "qemu/cacheinfo.h"
 
 int qemu_icache_linesize = 0;
 int qemu_icache_linesize_log;

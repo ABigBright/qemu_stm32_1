@@ -622,7 +622,6 @@ static void qjack_enable_in(HWVoiceIn *hw, bool enable)
     ji->c.enabled = enable;
 }
 
-#if !defined(WIN32) && defined(CONFIG_PTHREAD_SETNAME_NP_W_TID)
 static int qjack_thread_creator(jack_native_thread_t *thread,
     const pthread_attr_t *attr, void *(*function)(void *), void *arg)
 {
@@ -636,7 +635,6 @@ static int qjack_thread_creator(jack_native_thread_t *thread,
 
     return ret;
 }
-#endif
 
 static void *qjack_init(Audiodev *dev)
 {
@@ -689,9 +687,7 @@ static void register_audio_jack(void)
 {
     qemu_mutex_init(&qjack_shutdown_lock);
     audio_driver_register(&jack_driver);
-#if !defined(WIN32) && defined(CONFIG_PTHREAD_SETNAME_NP_W_TID)
     jack_set_thread_creator(qjack_thread_creator);
-#endif
     jack_set_error_function(qjack_error);
     jack_set_info_function(qjack_info);
 }

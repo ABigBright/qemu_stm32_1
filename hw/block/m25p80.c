@@ -170,6 +170,8 @@ typedef struct FlashPartInfo {
 
 #define SPANSION_CONTINUOUS_READ_MODE_CMD_LEN 1
 #define WINBOND_CONTINUOUS_READ_MODE_CMD_LEN 1
+#define GIGADEVICE_CONTINUOUS_READ_MODE_CMD_LEN 1
+
 
 static const FlashPartInfo known_devices[] = {
     /* Atmel -- some are (confusingly) marketed as "DataFlash" */
@@ -255,8 +257,6 @@ static const FlashPartInfo known_devices[] = {
     { INFO("n25q512a",    0x20ba20,      0,  64 << 10, 1024, ER_4K) },
     { INFO("n25q512ax3",  0x20ba20,  0x1000,  64 << 10, 1024, ER_4K) },
     { INFO("mt25ql512ab", 0x20ba20, 0x1044, 64 << 10, 1024, ER_4K | ER_32K) },
-    { INFO_STACKED("mt35xu01g", 0x2c5b1b, 0x104100, 128 << 10, 1024,
-                   ER_4K | ER_32K, 2) },
     { INFO_STACKED("n25q00",    0x20ba21, 0x1000, 64 << 10, 2048, ER_4K, 4) },
     { INFO_STACKED("n25q00a",   0x20bb21, 0x1000, 64 << 10, 2048, ER_4K, 4) },
     { INFO_STACKED("mt25ql01g", 0x20ba21, 0x1040, 64 << 10, 2048, ER_4K, 2) },
@@ -430,6 +430,7 @@ typedef enum {
     MAN_WINBOND,
     MAN_SST,
     MAN_ISSI,
+    MAN_GIGADEVICE,
     MAN_GENERIC,
 } Manufacturer;
 
@@ -507,6 +508,8 @@ static inline Manufacturer get_man(Flash *s)
         return MAN_SST;
     case 0x9D:
         return MAN_ISSI;
+    case 0xC8:
+    	return MAN_GIGADEVICE;
     default:
         return MAN_GENERIC;
     }
@@ -950,6 +953,9 @@ static void decode_dio_read_cmd(Flash *s)
     case MAN_WINBOND:
         s->needed_bytes += WINBOND_CONTINUOUS_READ_MODE_CMD_LEN;
         break;
+    case MAN_GIGADEVICE:
+        s->needed_bytes += GIGADEVICE_CONTINUOUS_READ_MODE_CMD_LEN;
+        break;
     case MAN_SPANSION:
         s->needed_bytes += SPANSION_CONTINUOUS_READ_MODE_CMD_LEN;
         s->needed_bytes += extract32(s->spansion_cr2v,
@@ -997,6 +1003,7 @@ static void decode_qio_read_cmd(Flash *s)
     /* Dummy cycles modeled with bytes writes instead of bits */
     switch (get_man(s)) {
     case MAN_WINBOND:
+    case MAN_GIGADEVICE:
         s->needed_bytes += WINBOND_CONTINUOUS_READ_MODE_CMD_LEN;
         s->needed_bytes += 4;
         break;

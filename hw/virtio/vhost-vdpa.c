@@ -292,34 +292,18 @@ static int vhost_vdpa_call(struct vhost_dev *dev, unsigned long int request,
     return ret < 0 ? -errno : ret;
 }
 
-static int vhost_vdpa_add_status(struct vhost_dev *dev, uint8_t status)
+static void vhost_vdpa_add_status(struct vhost_dev *dev, uint8_t status)
 {
     uint8_t s;
-    int ret;
 
     trace_vhost_vdpa_add_status(dev, status);
-    ret = vhost_vdpa_call(dev, VHOST_VDPA_GET_STATUS, &s);
-    if (ret < 0) {
-        return ret;
+    if (vhost_vdpa_call(dev, VHOST_VDPA_GET_STATUS, &s)) {
+        return;
     }
 
     s |= status;
 
-    ret = vhost_vdpa_call(dev, VHOST_VDPA_SET_STATUS, &s);
-    if (ret < 0) {
-        return ret;
-    }
-
-    ret = vhost_vdpa_call(dev, VHOST_VDPA_GET_STATUS, &s);
-    if (ret < 0) {
-        return ret;
-    }
-
-    if (!(s & status)) {
-        return -EIO;
-    }
-
-    return 0;
+    vhost_vdpa_call(dev, VHOST_VDPA_SET_STATUS, &s);
 }
 
 static void vhost_vdpa_get_iova_range(struct vhost_vdpa *v)
@@ -500,7 +484,7 @@ static int vhost_vdpa_set_mem_table(struct vhost_dev *dev,
         }
     }
     if (mem->padding) {
-        return -EINVAL;
+        return -1;
     }
 
     return 0;
@@ -517,11 +501,14 @@ static int vhost_vdpa_set_features(struct vhost_dev *dev,
 
     trace_vhost_vdpa_set_features(dev, features);
     ret = vhost_vdpa_call(dev, VHOST_SET_FEATURES, &features);
+    uint8_t status = 0;
     if (ret) {
         return ret;
     }
+    vhost_vdpa_add_status(dev, VIRTIO_CONFIG_S_FEATURES_OK);
+    vhost_vdpa_call(dev, VHOST_VDPA_GET_STATUS, &status);
 
-    return vhost_vdpa_add_status(dev, VIRTIO_CONFIG_S_FEATURES_OK);
+    return !(status & VIRTIO_CONFIG_S_FEATURES_OK);
 }
 
 static int vhost_vdpa_set_backend_cap(struct vhost_dev *dev)
@@ -663,8 +650,12 @@ static int vhost_vdpa_dev_start(struct vhost_dev *dev, bool started)
     }
 
     if (started) {
+        uint8_t status = 0;
         memory_listener_register(&v->listener, &address_space_memory);
-        return vhost_vdpa_add_status(dev, VIRTIO_CONFIG_S_DRIVER_OK);
+        vhost_vdpa_add_status(dev, VIRTIO_CONFIG_S_DRIVER_OK);
+        vhost_vdpa_call(dev, VHOST_VDPA_GET_STATUS, &status);
+
+        return !(status & VIRTIO_CONFIG_S_DRIVER_OK);
     } else {
         vhost_vdpa_reset_device(dev);
         vhost_vdpa_add_status(dev, VIRTIO_CONFIG_S_ACKNOWLEDGE |

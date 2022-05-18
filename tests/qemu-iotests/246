@@ -23,8 +23,7 @@
 import iotests
 from iotests import log
 
-iotests.script_initialize(supported_fmts=['qcow2'],
-                          unsupported_imgopts=['compat'])
+iotests.script_initialize(supported_fmts=['qcow2'])
 size = 64 * 1024 * 1024 * 1024
 gran_small = 32 * 1024
 gran_large = 128 * 1024

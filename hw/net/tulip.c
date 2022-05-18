@@ -70,36 +70,32 @@ static const VMStateDescription vmstate_pci_tulip = {
 static void tulip_desc_read(TULIPState *s, hwaddr p,
         struct tulip_descriptor *desc)
 {
-    const MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
-
     if (s->csr[0] & CSR0_DBO) {
-        ldl_be_pci_dma(&s->dev, p, &desc->status, attrs);
-        ldl_be_pci_dma(&s->dev, p + 4, &desc->control, attrs);
-        ldl_be_pci_dma(&s->dev, p + 8, &desc->buf_addr1, attrs);
-        ldl_be_pci_dma(&s->dev, p + 12, &desc->buf_addr2, attrs);
+        desc->status = ldl_be_pci_dma(&s->dev, p);
+        desc->control = ldl_be_pci_dma(&s->dev, p + 4);
+        desc->buf_addr1 = ldl_be_pci_dma(&s->dev, p + 8);
+        desc->buf_addr2 = ldl_be_pci_dma(&s->dev, p + 12);
     } else {
-        ldl_le_pci_dma(&s->dev, p, &desc->status, attrs);
-        ldl_le_pci_dma(&s->dev, p + 4, &desc->control, attrs);
-        ldl_le_pci_dma(&s->dev, p + 8, &desc->buf_addr1, attrs);
-        ldl_le_pci_dma(&s->dev, p + 12, &desc->buf_addr2, attrs);
+        desc->status = ldl_le_pci_dma(&s->dev, p);
+        desc->control = ldl_le_pci_dma(&s->dev, p + 4);
+        desc->buf_addr1 = ldl_le_pci_dma(&s->dev, p + 8);
+        desc->buf_addr2 = ldl_le_pci_dma(&s->dev, p + 12);
     }
 }
 
 static void tulip_desc_write(TULIPState *s, hwaddr p,
         struct tulip_descriptor *desc)
 {
-    const MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
-
     if (s->csr[0] & CSR0_DBO) {
-        stl_be_pci_dma(&s->dev, p, desc->status, attrs);
-        stl_be_pci_dma(&s->dev, p + 4, desc->control, attrs);
-        stl_be_pci_dma(&s->dev, p + 8, desc->buf_addr1, attrs);
-        stl_be_pci_dma(&s->dev, p + 12, desc->buf_addr2, attrs);
+        stl_be_pci_dma(&s->dev, p, desc->status);
+        stl_be_pci_dma(&s->dev, p + 4, desc->control);
+        stl_be_pci_dma(&s->dev, p + 8, desc->buf_addr1);
+        stl_be_pci_dma(&s->dev, p + 12, desc->buf_addr2);
     } else {
-        stl_le_pci_dma(&s->dev, p, desc->status, attrs);
-        stl_le_pci_dma(&s->dev, p + 4, desc->control, attrs);
-        stl_le_pci_dma(&s->dev, p + 8, desc->buf_addr1, attrs);
-        stl_le_pci_dma(&s->dev, p + 12, desc->buf_addr2, attrs);
+        stl_le_pci_dma(&s->dev, p, desc->status);
+        stl_le_pci_dma(&s->dev, p + 4, desc->control);
+        stl_le_pci_dma(&s->dev, p + 8, desc->buf_addr1);
+        stl_le_pci_dma(&s->dev, p + 12, desc->buf_addr2);
     }
 }
 

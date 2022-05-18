@@ -2799,6 +2799,12 @@ static void translate_wur(DisasContext *dc, const OpcodeArg arg[],
     tcg_gen_mov_i32(cpu_UR[par[0]], arg[0].in);
 }
 
+static void translate_xur_f64(DisasContext *dc, const OpcodeArg arg[],
+                              const uint32_t par[])
+{
+    /* no-op */
+}
+
 static void translate_xor(DisasContext *dc, const OpcodeArg arg[],
                           const uint32_t par[])
 {
@@ -5546,6 +5552,24 @@ static const XtensaOpcodeOps core_ops[] = {
         .translate = translate_wur,
         .par = (const uint32_t[]){EXPSTATE},
     }, {
+        .name = "wur.f64r_lo",
+        .translate = translate_xur_f64,
+    }, {
+        .name = "wur.f64r_hi",
+        .translate = translate_xur_f64,
+    }, {
+        .name = "wur.f64s",
+        .translate = translate_xur_f64,
+    }, {
+        .name = "rur.f64r_lo",
+        .translate = translate_xur_f64,
+    }, {
+        .name = "rur.f64r_hi",
+        .translate = translate_xur_f64,
+    }, {
+        .name = "rur.f64s",
+        .translate = translate_xur_f64,
+    }, {
         .name = "wur.threadptr",
         .translate = translate_wur,
         .par = (const uint32_t[]){THREADPTR},
@@ -7077,7 +7101,7 @@ static void translate_ldsti_d(DisasContext *dc, const OpcodeArg arg[],
     } else {
         addr = arg[1].in;
     }
-    mop = gen_load_store_alignment(dc, MO_TEUQ, addr);
+    mop = gen_load_store_alignment(dc, MO_TEQ, addr);
     if (par[0]) {
         tcg_gen_qemu_st_i64(arg[0].in, addr, dc->cring, mop);
     } else {
@@ -7142,7 +7166,7 @@ static void translate_ldstx_d(DisasContext *dc, const OpcodeArg arg[],
     } else {
         addr = arg[1].in;
     }
-    mop = gen_load_store_alignment(dc, MO_TEUQ, addr);
+    mop = gen_load_store_alignment(dc, MO_TEQ, addr);
     if (par[0]) {
         tcg_gen_qemu_st_i64(arg[0].in, addr, dc->cring, mop);
     } else {

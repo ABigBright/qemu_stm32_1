@@ -15,7 +15,7 @@ if unpack_edk2_blobs
     roms += custom_target(f,
                   build_by_default: have_system,
                   output: f,
-                  input: files('@0@.bz2'.format(f)),
+                  input: '@0@.bz2'.format(f),
                   capture: true,
                   install: get_option('install_blobs'),
                   install_dir: qemu_datadir,
@@ -57,6 +57,8 @@ blobs = files(
   'efi-virtio.rom',
   'efi-e1000e.rom',
   'efi-vmxnet3.rom',
+  'esp32-v3-rom.bin',
+  'esp32-v3-rom-app.bin',
   'qemu-nsis.bmp',
   'bamboo.dtb',
   'canyonlands.dtb',
@@ -80,9 +82,9 @@ blobs = files(
   'hppa-firmware.img',
   'opensbi-riscv32-generic-fw_dynamic.bin',
   'opensbi-riscv64-generic-fw_dynamic.bin',
+  'opensbi-riscv32-generic-fw_dynamic.elf',
+  'opensbi-riscv64-generic-fw_dynamic.elf',
   'npcm7xx_bootrom.bin',
-  'vof.bin',
-  'vof-nvram.bin',
 )
 
 if get_option('install_blobs')

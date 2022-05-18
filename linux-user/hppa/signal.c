@@ -191,9 +191,9 @@ long do_rt_sigreturn(CPUArchState *env)
     target_restore_altstack(&frame->uc.tuc_stack, env);
 
     unlock_user_struct(frame, frame_addr, 0);
-    return -QEMU_ESIGRETURN;
+    return -TARGET_QEMU_ESIGRETURN;
 
  badframe:
     force_sig(TARGET_SIGSEGV);
-    return -QEMU_ESIGRETURN;
+    return -TARGET_QEMU_ESIGRETURN;
 }

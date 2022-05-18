@@ -97,8 +97,7 @@ enum virtio_vsock_shutdown {
 
 /* VIRTIO_VSOCK_OP_RW flags values */
 enum virtio_vsock_rw {
-	VIRTIO_VSOCK_SEQ_EOM = 1,
-	VIRTIO_VSOCK_SEQ_EOR = 2,
+	VIRTIO_VSOCK_SEQ_EOR = 1,
 };
 
 #endif /* _LINUX_VIRTIO_VSOCK_H */

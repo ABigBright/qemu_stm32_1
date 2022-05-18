@@ -3,7 +3,6 @@
 #include "qemu/error-report.h"
 #include "qemu/module.h"
 #include "qemu/option.h"
-#include "qemu/hw-version.h"
 #include "hw/qdev-properties.h"
 #include "hw/scsi/scsi.h"
 #include "migration/qemu-file-types.h"
@@ -761,7 +760,7 @@ SCSIRequest *scsi_req_new(SCSIDevice *d, uint32_t tag, uint32_t lun,
     }
 
     req->cmd = cmd;
-    req->residual = req->cmd.xfer;
+    req->resid = req->cmd.xfer;
 
     switch (buf[0]) {
     case INQUIRY:
@@ -1409,7 +1408,7 @@ void scsi_req_data(SCSIRequest *req, int len)
     trace_scsi_req_data(req->dev->id, req->lun, req->tag, len);
     assert(req->cmd.mode != SCSI_XFER_NONE);
     if (!req->sg) {
-        req->residual -= len;
+        req->resid -= len;
         req->bus->info->transfer_data(req, len);
         return;
     }
@@ -1422,11 +1421,9 @@ void scsi_req_data(SCSIRequest *req, int len)
 
     buf = scsi_req_get_buf(req);
     if (req->cmd.mode == SCSI_XFER_FROM_DEV) {
-        dma_buf_read(buf, len, &req->residual, req->sg,
-                     MEMTXATTRS_UNSPECIFIED);
+        req->resid = dma_buf_read(buf, len, req->sg);
     } else {
-        dma_buf_write(buf, len, &req->residual, req->sg,
-                      MEMTXATTRS_UNSPECIFIED);
+        req->resid = dma_buf_write(buf, len, req->sg);
     }
     scsi_req_continue(req);
 }
@@ -1515,7 +1512,7 @@ void scsi_req_complete(SCSIRequest *req, int status)
 
     scsi_req_ref(req);
     scsi_req_dequeue(req);
-    req->bus->info->complete(req, req->residual);
+    req->bus->info->complete(req, req->resid);
 
     /* Cancelled requests might end up being completed instead of cancelled */
     notifier_list_notify(&req->cancel_notifiers, req);

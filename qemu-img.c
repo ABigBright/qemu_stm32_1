@@ -902,7 +902,7 @@ static void common_block_job_cb(void *opaque, int ret)
 static void run_block_job(BlockJob *job, Error **errp)
 {
     uint64_t progress_current, progress_total;
-    AioContext *aio_context = block_job_get_aio_context(job);
+    AioContext *aio_context = blk_get_aio_context(job->blk);
     int ret = 0;
 
     aio_context_acquire(aio_context);
@@ -1171,34 +1171,19 @@ static int is_allocated_sectors(const uint8_t *buf, int n, int *pnum,
         }
     }
 
-    if (i == n) {
-        /*
-         * The whole buf is the same.
-         * No reason to split it into chunks, so return now.
-         */
-        *pnum = i;
-        return !is_zero;
-    }
-
     tail = (sector_num + i) & (alignment - 1);
     if (tail) {
         if (is_zero && i <= tail) {
-            /*
-             * For sure next sector after i is data, and it will rewrite this
-             * tail anyway due to RMW. So, let's just write data now.
-             */
+            /* treat unallocated areas which only consist
+             * of a small tail as allocated. */
             is_zero = false;
         }
         if (!is_zero) {
-            /* If possible, align up end offset of allocated areas. */
+            /* align up end offset of allocated areas. */
             i += alignment - tail;
             i = MIN(i, n);
         } else {
-            /*
-             * For sure next sector after i is data, and it will rewrite this
-             * tail anyway due to RMW. Better is avoid RMW and write zeroes up
-             * to aligned bound.
-             */
+            /* align down end offset of zero areas. */
             i -= tail;
         }
     }

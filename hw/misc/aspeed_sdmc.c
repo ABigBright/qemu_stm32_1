@@ -130,7 +130,6 @@ static uint64_t aspeed_sdmc_read(void *opaque, hwaddr addr, unsigned size)
         return 0;
     }
 
-    trace_aspeed_sdmc_read(addr, s->regs[addr]);
     return s->regs[addr];
 }
 
@@ -149,7 +148,6 @@ static void aspeed_sdmc_write(void *opaque, hwaddr addr, uint64_t data,
         return;
     }
 
-    trace_aspeed_sdmc_write(addr, data);
     asc->write(s, addr, data);
 }
 

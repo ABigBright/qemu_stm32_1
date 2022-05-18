@@ -30,7 +30,6 @@
 #include "elf.h"
 #include "sysemu/device_tree.h"
 #include "sysemu/qtest.h"
-#include "sysemu/kvm.h"
 
 #include <libfdt.h>
 
@@ -52,9 +51,7 @@ char *riscv_plic_hart_config_string(int hart_count)
         CPUState *cs = qemu_get_cpu(i);
         CPURISCVState *env = &RISCV_CPU(cs)->env;
 
-        if (kvm_enabled()) {
-            vals[i] = "S";
-        } else if (riscv_has_ext(env, RVS)) {
+        if (riscv_has_ext(env, RVS)) {
             vals[i] = "MS";
         } else {
             vals[i] = "M";
@@ -154,19 +151,12 @@ target_ulong riscv_load_kernel(const char *kernel_filename,
                                target_ulong kernel_start_addr,
                                symbol_fn_t sym_cb)
 {
-    uint64_t kernel_load_base, kernel_entry;
+    uint64_t kernel_entry;
 
-    /*
-     * NB: Use low address not ELF entry point to ensure that the fw_dynamic
-     * behaviour when loading an ELF matches the fw_payload, fw_jump and BBL
-     * behaviour, as well as fw_dynamic with a raw binary, all of which jump to
-     * the (expected) load address load address. This allows kernels to have
-     * separate SBI and ELF entry points (used by FreeBSD, for example).
-     */
     if (load_elf_ram_sym(kernel_filename, NULL, NULL, NULL,
-                         NULL, &kernel_load_base, NULL, NULL, 0,
+                         &kernel_entry, NULL, NULL, NULL, 0,
                          EM_RISCV, 1, 0, NULL, true, sym_cb) > 0) {
-        return kernel_load_base;
+        return kernel_entry;
     }
 
     if (load_uimage_as(kernel_filename, &kernel_entry, NULL, NULL,
@@ -326,15 +316,4 @@ void riscv_setup_rom_reset_vec(MachineState *machine, RISCVHartArrayState *harts
                                  kernel_entry);
 
     return;
-}
-
-void riscv_setup_direct_kernel(hwaddr kernel_addr, hwaddr fdt_addr)
-{
-    CPUState *cs;
-
-    for (cs = first_cpu; cs; cs = CPU_NEXT(cs)) {
-        RISCVCPU *riscv_cpu = RISCV_CPU(cs);
-        riscv_cpu->env.kernel_addr = kernel_addr;
-        riscv_cpu->env.fdt_addr = fdt_addr;
-    }
 }

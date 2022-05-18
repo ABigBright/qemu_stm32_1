@@ -44,7 +44,6 @@
 #include "hw/pci/pci.h"
 #include "net_rx_pkt.h"
 #include "hw/virtio/vhost.h"
-#include "sysemu/qtest.h"
 
 #define VIRTIO_NET_VM_VERSION    11
 
@@ -927,11 +926,7 @@ static void virtio_net_set_features(VirtIODevice *vdev, uint64_t features)
         qatomic_set(&n->failover_primary_hidden, false);
         failover_add_primary(n, &err);
         if (err) {
-            if (!qtest_enabled()) {
-                warn_report_err(err);
-            } else {
-                error_free(err);
-            }
+            warn_report_err(err);
         }
     }
 }

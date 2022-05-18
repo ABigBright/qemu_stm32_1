@@ -60,8 +60,7 @@ void *create_device_tree(int *sizep)
     }
     ret = fdt_open_into(fdt, fdt, *sizep);
     if (ret) {
-        error_report("%s: Unable to copy device tree into memory: %s",
-                     __func__, fdt_strerror(ret));
+        error_report("Unable to copy device tree in memory");
         exit(1);
     }
 
@@ -105,8 +104,7 @@ void *load_device_tree(const char *filename_path, int *sizep)
 
     ret = fdt_open_into(fdt, fdt, dt_size);
     if (ret) {
-        error_report("%s: Unable to copy device tree into memory: %s",
-                     __func__, fdt_strerror(ret));
+        error_report("Unable to copy device tree in memory");
         goto fail;
     }
 
@@ -558,6 +556,7 @@ int qemu_fdt_add_subnode(void *fdt, const char *name)
 int qemu_fdt_add_path(void *fdt, const char *path)
 {
     const char *name;
+    const char *p = path;
     int namelen, retval;
     int parent = 0;
 
@@ -565,10 +564,10 @@ int qemu_fdt_add_path(void *fdt, const char *path)
         return -1;
     }
 
-    do {
-        name = path + 1;
-        path = strchr(name, '/');
-        namelen = path != NULL ? path - name : strlen(name);
+    while (p) {
+        name = p + 1;
+        p = strchr(name, '/');
+        namelen = p != NULL ? p - name : strlen(name);
 
         retval = fdt_subnode_offset_namelen(fdt, parent, name, namelen);
         if (retval < 0 && retval != -FDT_ERR_NOTFOUND) {
@@ -585,7 +584,7 @@ int qemu_fdt_add_path(void *fdt, const char *path)
         }
 
         parent = retval;
-    } while (path);
+    }
 
     return retval;
 }

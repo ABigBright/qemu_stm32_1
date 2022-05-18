@@ -53,10 +53,6 @@ if have_system or have_tools
   tests += {
     'test-qmp-event': [testqapi],
   }
-
-  if seccomp.found()
-    tests += {'test-seccomp': ['../../softmmu/qemu-seccomp.c', seccomp]}
-  endif
 endif
 
 if have_block
@@ -110,13 +106,13 @@ if have_block
   if 'CONFIG_POSIX' in config_host
     tests += {'test-image-locking': [testblock]}
   endif
-  if config_host_data.get('CONFIG_REPLICATION')
+  if 'CONFIG_REPLICATION' in config_host
     tests += {'test-replication': [testblock]}
   endif
   if nettle.found() or gcrypt.found()
     tests += {'test-crypto-pbkdf': [io]}
   endif
-  if config_host_data.get('CONFIG_EPOLL_CREATE1')
+  if 'CONFIG_EPOLL_CREATE1' in config_host
     tests += {'test-fdmon-epoll': [testblock]}
   endif
 endif
@@ -133,7 +129,7 @@ if have_system
     'test-vmstate': [migration, io],
     'test-yank': ['socket-helpers.c', qom, io, chardev]
   }
-  if config_host_data.get('CONFIG_INOTIFY1')
+  if 'CONFIG_INOTIFY1' in config_host
     tests += {'test-util-filemonitor': []}
   endif
 
@@ -153,7 +149,9 @@ if have_system
   endif
 endif
 
-if have_ga and targetos == 'linux' and 'CONFIG_TSAN' not in config_host
+if 'CONFIG_TSAN' not in config_host and \
+   'CONFIG_GUEST_AGENT' in config_host and \
+   'CONFIG_LINUX' in config_host
   tests += {'test-qga': ['../qtest/libqtest.c']}
   test_deps += {'test-qga': qga}
 endif

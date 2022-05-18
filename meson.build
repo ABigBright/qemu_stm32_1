@@ -1,11 +1,7 @@
-project('qemu', ['c'], meson_version: '>=0.59.3',
+project('qemu', ['c'], meson_version: '>=0.58.2',
         default_options: ['warning_level=1', 'c_std=gnu11', 'cpp_std=gnu++11', 'b_colorout=auto',
-                          'b_staticpic=false', 'stdsplit=false'],
+                          'b_staticpic=false'],
         version: files('VERSION'))
-
-add_test_setup('quick', exclude_suites: ['block', 'slow', 'thorough'], is_default: true)
-add_test_setup('slow', exclude_suites: ['block', 'thorough'], env: ['G_TEST_SLOW=1', 'SPEED=slow'])
-add_test_setup('thorough', exclude_suites: ['block'], env: ['G_TEST_SLOW=1', 'SPEED=thorough'])
 
 not_found = dependency('', required: false)
 keyval = import('keyval')
@@ -42,21 +38,6 @@ qemu_icondir = get_option('datadir') / 'icons'
 
 config_host_data = configuration_data()
 genh = []
-qapi_trace_events = []
-
-bsd_oses = ['gnu/kfreebsd', 'freebsd', 'netbsd', 'openbsd', 'dragonfly', 'darwin']
-supported_oses = ['windows', 'freebsd', 'netbsd', 'openbsd', 'darwin', 'sunos', 'linux']
-supported_cpus = ['ppc', 'ppc64', 's390x', 'riscv', 'x86', 'x86_64',
-  'arm', 'aarch64', 'loongarch64', 'mips', 'mips64', 'sparc', 'sparc64']
-
-cpu = host_machine.cpu_family()
-
-# Unify riscv* to a single family.
-if cpu in ['riscv32', 'riscv64']
-  cpu = 'riscv'
-endif
-
-targetos = host_machine.system()
 
 target_dirs = config_host['TARGET_DIRS'].split()
 have_linux_user = false
@@ -68,27 +49,23 @@ foreach target : target_dirs
   have_system = have_system or target.endswith('-softmmu')
 endforeach
 have_user = have_linux_user or have_bsd_user
-have_tools = get_option('tools') \
-  .disable_auto_if(not have_system) \
-  .allowed()
-have_ga = get_option('guest_agent') \
-  .disable_auto_if(not have_system and not have_tools) \
-  .require(targetos in ['sunos', 'linux', 'windows'],
-           error_message: 'unsupported OS for QEMU guest agent') \
-  .allowed()
+have_tools = 'CONFIG_TOOLS' in config_host
 have_block = have_system or have_tools
 
 python = import('python').find_installation()
 
-if cpu not in supported_cpus
-  host_arch = 'unknown'
-elif cpu == 'x86'
-  host_arch = 'i386'
-elif cpu == 'mips64'
-  host_arch = 'mips'
-else
-  host_arch = cpu
+supported_oses = ['windows', 'freebsd', 'netbsd', 'openbsd', 'darwin', 'sunos', 'linux']
+supported_cpus = ['ppc', 'ppc64', 's390x', 'riscv', 'x86', 'x86_64',
+  'arm', 'aarch64', 'mips', 'mips64', 'sparc', 'sparc64']
+
+cpu = host_machine.cpu_family()
+
+# Unify riscv* to a single family.
+if cpu in ['riscv32', 'riscv64']
+  cpu = 'riscv'
 endif
+
+targetos = host_machine.system()
 
 if cpu in ['x86', 'x86_64']
   kvm_targets = ['i386-softmmu', 'x86_64-softmmu']
@@ -100,14 +77,12 @@ elif cpu in ['ppc', 'ppc64']
   kvm_targets = ['ppc-softmmu', 'ppc64-softmmu']
 elif cpu in ['mips', 'mips64']
   kvm_targets = ['mips-softmmu', 'mipsel-softmmu', 'mips64-softmmu', 'mips64el-softmmu']
-elif cpu in ['riscv']
-  kvm_targets = ['riscv32-softmmu', 'riscv64-softmmu']
 else
   kvm_targets = []
 endif
 
 kvm_targets_c = '""'
-if get_option('kvm').allowed() and targetos == 'linux'
+if not get_option('kvm').disabled() and targetos == 'linux'
   kvm_targets_c = '"' + '" ,"'.join(kvm_targets) + '"'
 endif
 config_host_data.set('CONFIG_KVM_TARGETS', kvm_targets_c)
@@ -171,16 +146,6 @@ endif
 # Compiler flags #
 ##################
 
-qemu_cflags = config_host['QEMU_CFLAGS'].split()
-qemu_cxxflags = config_host['QEMU_CXXFLAGS'].split()
-qemu_ldflags = config_host['QEMU_LDFLAGS'].split()
-
-if get_option('gprof')
-  qemu_cflags += ['-p']
-  qemu_cxxflags += ['-p']
-  qemu_ldflags += ['-p']
-endif
-
 # Specify linker-script with add_project_link_arguments so that it is not placed
 # within a linker --start-group/--end-group pair
 if get_option('fuzzing')
@@ -216,9 +181,12 @@ if get_option('fuzzing')
   endif
 endif
 
-add_global_arguments(qemu_cflags, native: false, language: ['c', 'objc'])
-add_global_arguments(qemu_cxxflags, native: false, language: ['cpp'])
-add_global_link_arguments(qemu_ldflags, native: false, language: ['c', 'cpp', 'objc'])
+add_global_arguments(config_host['QEMU_CFLAGS'].split(),
+                     native: false, language: ['c', 'objc'])
+add_global_arguments(config_host['QEMU_CXXFLAGS'].split(),
+                     native: false, language: 'cpp')
+add_global_link_arguments(config_host['QEMU_LDFLAGS'].split(),
+                          native: false, language: ['c', 'cpp', 'objc'])
 
 if targetos == 'linux'
   add_project_arguments('-isystem', meson.current_source_dir() / 'linux-headers',
@@ -257,7 +225,6 @@ endif
 # Target-specific checks and dependencies #
 ###########################################
 
-# Fuzzing
 if get_option('fuzzing') and get_option('fuzzing_engine') == '' and \
     not cc.links('''
           #include <stdint.h>
@@ -269,7 +236,6 @@ if get_option('fuzzing') and get_option('fuzzing_engine') == '' and \
   error('Your compiler does not support -fsanitize=fuzzer')
 endif
 
-# Tracing backends
 if 'ftrace' in get_option('trace_backends') and targetos != 'linux'
   error('ftrace is supported only on Linux')
 endif
@@ -283,19 +249,15 @@ if 'syslog' in get_option('trace_backends') and not cc.compiles('''
   error('syslog is not supported on this system')
 endif
 
-# Miscellaneous Linux-only features
-get_option('mpath') \
-  .require(targetos == 'linux', error_message: 'Multipath is supported only on Linux')
+if targetos != 'linux' and get_option('mpath').enabled()
+  error('Multipath is supported only on Linux')
+endif
 
-multiprocess_allowed = get_option('multiprocess') \
-  .require(targetos == 'linux', error_message: 'Multiprocess QEMU is supported only on Linux') \
-  .allowed()
+if targetos != 'linux' and get_option('multiprocess').enabled()
+  error('Multiprocess QEMU is supported only on Linux')
+endif
+multiprocess_allowed = targetos == 'linux' and not get_option('multiprocess').disabled()
 
-have_tpm = get_option('tpm') \
-  .require(targetos != 'windows', error_message: 'TPM emulation only available on POSIX systems') \
-  .allowed()
-
-# Target-specific libraries and flags
 libm = cc.find_library('m', required: false)
 threads = dependency('threads')
 util = cc.find_library('util', required: false)
@@ -307,12 +269,8 @@ iokit = []
 emulator_link_args = []
 nvmm =not_found
 hvf = not_found
-midl = not_found
-widl = not_found
 host_dsosuf = '.so'
 if targetos == 'windows'
-  midl = find_program('midl', required: false)
-  widl = find_program('widl', required: false)
   socket = cc.find_library('ws2_32')
   winmm = cc.find_library('winmm')
 
@@ -334,24 +292,23 @@ elif targetos == 'haiku'
             cc.find_library('network'),
             cc.find_library('bsd')]
 elif targetos == 'openbsd'
-  if get_option('tcg').allowed() and target_dirs.length() > 0
+  if not get_option('tcg').disabled() and target_dirs.length() > 0
     # Disable OpenBSD W^X if available
     emulator_link_args = cc.get_supported_link_arguments('-Wl,-z,wxneeded')
   endif
 endif
 
-# Target-specific configuration of accelerators
 accelerators = []
-if get_option('kvm').allowed() and targetos == 'linux'
+if not get_option('kvm').disabled() and targetos == 'linux'
   accelerators += 'CONFIG_KVM'
 endif
-if get_option('xen').allowed() and 'CONFIG_XEN_BACKEND' in config_host
+if not get_option('xen').disabled() and 'CONFIG_XEN_BACKEND' in config_host
   accelerators += 'CONFIG_XEN'
-  have_xen_pci_passthrough = get_option('xen_pci_passthrough').allowed() and targetos == 'linux'
+  have_xen_pci_passthrough = not get_option('xen_pci_passthrough').disabled() and targetos == 'linux'
 else
   have_xen_pci_passthrough = false
 endif
-if get_option('whpx').allowed() and targetos == 'windows'
+if not get_option('whpx').disabled() and targetos == 'windows'
   if get_option('whpx').enabled() and host_machine.cpu() != 'x86_64'
     error('WHPX requires 64-bit host')
   elif cc.has_header('WinHvPlatform.h', required: get_option('whpx')) and \
@@ -359,14 +316,14 @@ if get_option('whpx').allowed() and targetos == 'windows'
     accelerators += 'CONFIG_WHPX'
   endif
 endif
-if get_option('hvf').allowed()
+if not get_option('hvf').disabled()
   hvf = dependency('appleframeworks', modules: 'Hypervisor',
                    required: get_option('hvf'))
   if hvf.found()
     accelerators += 'CONFIG_HVF'
   endif
 endif
-if get_option('hax').allowed()
+if not get_option('hax').disabled()
   if get_option('hax').enabled() or targetos in ['windows', 'darwin', 'netbsd']
     accelerators += 'CONFIG_HAX'
   endif
@@ -378,9 +335,9 @@ if targetos == 'netbsd'
   endif
 endif
 
-tcg_arch = host_arch
-if get_option('tcg').allowed()
-  if host_arch == 'unknown'
+tcg_arch = config_host['ARCH']
+if not get_option('tcg').disabled()
+  if cpu not in supported_cpus
     if get_option('tcg_interpreter')
       warning('Unsupported CPU @0@, will use TCG with TCI (slow)'.format(cpu))
     else
@@ -396,11 +353,11 @@ if get_option('tcg').allowed()
   endif
   if get_option('tcg_interpreter')
     tcg_arch = 'tci'
-  elif host_arch == 'sparc64'
+  elif config_host['ARCH'] == 'sparc64'
     tcg_arch = 'sparc'
-  elif host_arch == 'x86_64'
+  elif config_host['ARCH'] in ['x86_64', 'x32']
     tcg_arch = 'i386'
-  elif host_arch == 'ppc64'
+  elif config_host['ARCH'] == 'ppc64'
     tcg_arch = 'ppc'
   endif
   add_project_arguments('-iquote', meson.current_source_dir() / 'tcg' / tcg_arch,
@@ -439,16 +396,14 @@ endif
 add_project_arguments(config_host['GLIB_CFLAGS'].split(),
                       native: false, language: ['c', 'cpp', 'objc'])
 glib = declare_dependency(compile_args: config_host['GLIB_CFLAGS'].split(),
-                          link_args: config_host['GLIB_LIBS'].split(),
-                          version: config_host['GLIB_VERSION'])
+                          link_args: config_host['GLIB_LIBS'].split())
 # override glib dep with the configure results (for subprojects)
 meson.override_dependency('glib-2.0', glib)
 
 gio = not_found
 if 'CONFIG_GIO' in config_host
   gio = declare_dependency(compile_args: config_host['GIO_CFLAGS'].split(),
-                           link_args: config_host['GIO_LIBS'].split(),
-                           version: config_host['GLIB_VERSION'])
+                           link_args: config_host['GIO_LIBS'].split())
 endif
 lttng = not_found
 if 'ust' in get_option('trace_backends')
@@ -470,9 +425,13 @@ if not get_option('linux_aio').auto() or have_block
 endif
 linux_io_uring = not_found
 if not get_option('linux_io_uring').auto() or have_block
-  linux_io_uring = dependency('liburing', version: '>=0.3',
-                              required: get_option('linux_io_uring'),
+  linux_io_uring = dependency('liburing', required: get_option('linux_io_uring'),
                               method: 'pkg-config', kwargs: static_kwargs)
+endif
+libxml2 = not_found
+if not get_option('libxml2').auto() or have_block
+  libxml2 = dependency('libxml-2.0', required: get_option('libxml2'),
+                       method: 'pkg-config', kwargs: static_kwargs)
 endif
 libnfs = not_found
 if not get_option('libnfs').auto() or have_block
@@ -493,7 +452,7 @@ libattr_test = '''
 
 libattr = not_found
 have_old_libattr = false
-if get_option('attr').allowed()
+if not get_option('attr').disabled()
   if cc.links(libattr_test)
     libattr = declare_dependency()
   else
@@ -625,9 +584,7 @@ if not get_option('zstd').auto() or have_block
                     method: 'pkg-config', kwargs: static_kwargs)
 endif
 virgl = not_found
-
-have_vhost_user_gpu = have_tools and targetos == 'linux' and pixman.found()
-if not get_option('virglrenderer').auto() or have_system or have_vhost_user_gpu
+if not get_option('virglrenderer').auto() or have_system
   virgl = dependency('virglrenderer',
                      method: 'pkg-config',
                      required: get_option('virglrenderer'),
@@ -651,7 +608,7 @@ endif
 mpathlibs = [libudev]
 mpathpersist = not_found
 mpathpersist_new_api = false
-if targetos == 'linux' and have_tools and get_option('mpath').allowed()
+if targetos == 'linux' and have_tools and not get_option('mpath').disabled()
   mpath_test_source_new = '''
     #include <libudev.h>
     #include <mpath_persist.h>
@@ -720,7 +677,7 @@ endif
 
 iconv = not_found
 curses = not_found
-if have_system and get_option('curses').allowed()
+if have_system and not get_option('curses').disabled()
   curses_test = '''
     #if defined(__APPLE__) || defined(__OpenBSD__)
     #define _XOPEN_SOURCE_EXTENDED 1
@@ -782,7 +739,7 @@ if have_system and get_option('curses').allowed()
       endforeach
     endif
   endif
-  if get_option('iconv').allowed()
+  if not get_option('iconv').disabled()
     foreach link_args : [ ['-liconv'], [] ]
       # Programs will be linked with glib and this will bring in libiconv on FreeBSD.
       # We need to use libiconv if available because mixing libiconv's headers with
@@ -917,15 +874,11 @@ if not get_option('glusterfs').auto() or have_block
     ''', dependencies: glusterfs)
   endif
 endif
-
 libssh = not_found
-if not get_option('libssh').auto() or have_block
-  libssh = dependency('libssh', version: '>=0.8.7',
-                    method: 'pkg-config',
-                    required: get_option('libssh'),
-                    kwargs: static_kwargs)
+if 'CONFIG_LIBSSH' in config_host
+  libssh = declare_dependency(compile_args: config_host['LIBSSH_CFLAGS'].split(),
+                              link_args: config_host['LIBSSH_LIBS'].split())
 endif
-
 libbzip2 = not_found
 if not get_option('bzip2').auto() or have_block
   libbzip2 = cc.find_library('bz2', has_headers: ['bzlib.h'],
@@ -961,7 +914,7 @@ if liblzfse.found() and not cc.links('''
 endif
 
 oss = not_found
-if get_option('oss').allowed() and have_system
+if have_system and not get_option('oss').disabled()
   if not cc.has_header('sys/soundcard.h')
     # not found
   elif targetos == 'netbsd'
@@ -1006,7 +959,6 @@ if (have_system or have_tools) and (virgl.found() or opengl.found())
   gbm = dependency('gbm', method: 'pkg-config', required: false,
                    kwargs: static_kwargs)
 endif
-have_vhost_user_gpu = have_vhost_user_gpu and virgl.found() and gbm.found()
 
 gnutls = not_found
 gnutls_crypto = not_found
@@ -1116,7 +1068,7 @@ vnc = not_found
 png = not_found
 jpeg = not_found
 sasl = not_found
-if get_option('vnc').allowed() and have_system
+if have_system and not get_option('vnc').disabled()
   vnc = declare_dependency() # dummy dependency
   png = dependency('libpng', required: get_option('vnc_png'),
                    method: 'pkg-config', kwargs: static_kwargs)
@@ -1190,27 +1142,13 @@ if lzo.found() and not cc.links('''
   endif
 endif
 
-numa = not_found
-if not get_option('numa').auto() or have_system or have_tools
-  numa = cc.find_library('numa', has_headers: ['numa.h'],
-                              required: get_option('numa'),
-                              kwargs: static_kwargs)
-endif
-if numa.found() and not cc.links('''
-   #include <numa.h>
-   int main(void) { return numa_available(); }
-   ''', dependencies: numa)
-  numa = not_found
-  if get_option('numa').enabled()
-    error('could not link numa')
-  else
-    warning('could not link numa, disabling')
-  endif
-endif
-
 rdma = not_found
 if 'CONFIG_RDMA' in config_host
   rdma = declare_dependency(link_args: config_host['RDMA_LIBS'].split())
+endif
+numa = not_found
+if 'CONFIG_NUMA' in config_host
+  numa = declare_dependency(link_args: config_host['NUMA_LIBS'].split())
 endif
 xen = not_found
 if 'CONFIG_XEN_BACKEND' in config_host
@@ -1274,7 +1212,7 @@ selinux = dependency('libselinux',
 malloc = []
 if get_option('malloc') == 'system'
   has_malloc_trim = \
-    get_option('malloc_trim').allowed() and \
+    not get_option('malloc_trim').disabled() and \
     cc.links('''#include <malloc.h>
                 int main(void) { malloc_trim(0); return 0; }''')
 else
@@ -1306,13 +1244,19 @@ statx_test = gnu_source_prefix + '''
 
 has_statx = cc.links(statx_test)
 
-have_vhost_user_blk_server = get_option('vhost_user_blk_server') \
-  .require(targetos == 'linux',
-           error_message: 'vhost_user_blk_server requires linux') \
-  .require('CONFIG_VHOST_USER' in config_host,
-           error_message: 'vhost_user_blk_server requires vhost-user support') \
-  .disable_auto_if(not have_system) \
-  .allowed()
+have_vhost_user_blk_server = (targetos == 'linux' and
+    'CONFIG_VHOST_USER' in config_host)
+
+if get_option('vhost_user_blk_server').enabled()
+    if targetos != 'linux'
+        error('vhost_user_blk_server requires linux')
+    elif 'CONFIG_VHOST_USER' not in config_host
+        error('vhost_user_blk_server requires vhost-user support')
+    endif
+elif get_option('vhost_user_blk_server').disabled() or not have_system
+    have_vhost_user_blk_server = false
+endif
+
 
 if get_option('fuse').disabled() and get_option('fuse_lseek').enabled()
   error('Cannot enable fuse-lseek while fuse is disabled')
@@ -1323,7 +1267,7 @@ fuse = dependency('fuse3', required: get_option('fuse'),
                   kwargs: static_kwargs)
 
 fuse_lseek = not_found
-if get_option('fuse_lseek').allowed()
+if not get_option('fuse_lseek').disabled()
   if fuse.version().version_compare('>=3.8')
     # Dummy dependency
     fuse_lseek = declare_dependency()
@@ -1439,33 +1383,32 @@ endif
 have_host_block_device = (targetos != 'darwin' or
     cc.has_header('IOKit/storage/IOMedia.h'))
 
-# FIXME enable_modules shouldn't be necessary, but: https://github.com/mesonbuild/meson/issues/8333
-dbus_display = get_option('dbus_display') \
-  .require(gio.version().version_compare('>=2.64'),
-           error_message: '-display dbus requires glib>=2.64') \
-  .require(enable_modules,
-           error_message: '-display dbus requires --enable-modules') \
-  .require(config_host.has_key('GDBUS_CODEGEN'),
-           error_message: '-display dbus requires gdbus-codegen') \
-  .allowed()
-
-have_virtfs = get_option('virtfs') \
-    .require(targetos == 'linux',
-             error_message: 'virtio-9p (virtfs) requires Linux') \
-    .require(libattr.found() and libcap_ng.found(),
-             error_message: 'virtio-9p (virtfs) requires libcap-ng-devel and libattr-devel') \
-    .disable_auto_if(not have_tools and not have_system) \
-    .allowed()
+have_virtfs = (targetos == 'linux' and
+    have_system and
+    libattr.found() and
+    libcap_ng.found())
 
 have_virtfs_proxy_helper = have_virtfs and have_tools
+
+if get_option('virtfs').enabled()
+  if not have_virtfs
+    if targetos != 'linux'
+      error('virtio-9p (virtfs) requires Linux')
+    elif not libcap_ng.found() or not libattr.found()
+      error('virtio-9p (virtfs) requires libcap-ng-devel and libattr-devel')
+    elif not have_system
+      error('virtio-9p (virtfs) needs system emulation support')
+    endif
+  endif
+elif get_option('virtfs').disabled()
+  have_virtfs = false
+endif
 
 foreach k : get_option('trace_backends')
   config_host_data.set('CONFIG_TRACE_' + k.to_upper(), true)
 endforeach
 config_host_data.set_quoted('CONFIG_TRACE_FILE', get_option('trace_file'))
-if get_option('iasl') != ''
-  config_host_data.set_quoted('CONFIG_IASL', get_option('iasl'))
-endif
+
 config_host_data.set_quoted('CONFIG_BINDIR', get_option('prefix') / get_option('bindir'))
 config_host_data.set_quoted('CONFIG_PREFIX', get_option('prefix'))
 config_host_data.set_quoted('CONFIG_QEMU_CONFDIR', get_option('prefix') / qemu_confdir)
@@ -1479,21 +1422,7 @@ config_host_data.set_quoted('CONFIG_QEMU_LOCALSTATEDIR', get_option('prefix') / 
 config_host_data.set_quoted('CONFIG_QEMU_MODDIR', get_option('prefix') / qemu_moddir)
 config_host_data.set_quoted('CONFIG_SYSCONFDIR', get_option('prefix') / get_option('sysconfdir'))
 
-have_slirp_smbd = get_option('slirp_smbd') \
-  .require(targetos != 'windows', error_message: 'Host smbd not supported on this platform.') \
-  .allowed()
-if have_slirp_smbd
-  smbd_path = get_option('smbd')
-  if smbd_path == ''
-    smbd_path = (targetos == 'solaris' ? '/usr/sfw/sbin/smbd' : '/usr/sbin/smbd')
-  endif
-  config_host_data.set_quoted('CONFIG_SMBD_COMMAND', smbd_path)
-endif
-
-config_host_data.set('HOST_' + host_arch.to_upper(), 1)
-
 config_host_data.set('CONFIG_ATTR', libattr.found())
-config_host_data.set('CONFIG_BDRV_WHITELIST_TOOLS', get_option('block_drv_whitelist_in_tools'))
 config_host_data.set('CONFIG_BRLAPI', brlapi.found())
 config_host_data.set('CONFIG_COCOA', cocoa.found())
 config_host_data.set('CONFIG_FUZZ', get_option('fuzzing'))
@@ -1522,18 +1451,14 @@ config_host_data.set('CONFIG_EBPF', libbpf.found())
 config_host_data.set('CONFIG_LIBDAXCTL', libdaxctl.found())
 config_host_data.set('CONFIG_LIBISCSI', libiscsi.found())
 config_host_data.set('CONFIG_LIBNFS', libnfs.found())
-config_host_data.set('CONFIG_LIBSSH', libssh.found())
 config_host_data.set('CONFIG_LINUX_AIO', libaio.found())
 config_host_data.set('CONFIG_LINUX_IO_URING', linux_io_uring.found())
 config_host_data.set('CONFIG_LIBPMEM', libpmem.found())
-config_host_data.set('CONFIG_NUMA', numa.found())
-config_host_data.set('CONFIG_PROFILER', get_option('profiler'))
 config_host_data.set('CONFIG_RBD', rbd.found())
 config_host_data.set('CONFIG_SDL', sdl.found())
 config_host_data.set('CONFIG_SDL_IMAGE', sdl_image.found())
 config_host_data.set('CONFIG_SECCOMP', seccomp.found())
 config_host_data.set('CONFIG_SNAPPY', snappy.found())
-config_host_data.set('CONFIG_TPM', have_tpm)
 config_host_data.set('CONFIG_USB_LIBUSB', libusb.found())
 config_host_data.set('CONFIG_VDE', vde.found())
 config_host_data.set('CONFIG_VHOST_USER_BLK_SERVER', have_vhost_user_blk_server)
@@ -1557,14 +1482,8 @@ config_host_data.set('CONFIG_ZSTD', zstd.found())
 config_host_data.set('CONFIG_FUSE', fuse.found())
 config_host_data.set('CONFIG_FUSE_LSEEK', fuse_lseek.found())
 config_host_data.set('CONFIG_SPICE_PROTOCOL', spice_protocol.found())
-if spice_protocol.found()
-config_host_data.set('CONFIG_SPICE_PROTOCOL_MAJOR', spice_protocol.version().split('.')[0])
-config_host_data.set('CONFIG_SPICE_PROTOCOL_MINOR', spice_protocol.version().split('.')[1])
-config_host_data.set('CONFIG_SPICE_PROTOCOL_MICRO', spice_protocol.version().split('.')[2])
-endif
 config_host_data.set('CONFIG_SPICE', spice.found())
 config_host_data.set('CONFIG_X11', x11.found())
-config_host_data.set('CONFIG_DBUS_DISPLAY', dbus_display)
 config_host_data.set('CONFIG_CFI', get_option('cfi'))
 config_host_data.set('CONFIG_SELINUX', selinux.found())
 config_host_data.set('QEMU_VERSION', '"@0@"'.format(meson.project_version()))
@@ -1575,19 +1494,6 @@ config_host_data.set('QEMU_VERSION_MICRO', meson.project_version().split('.')[2]
 config_host_data.set_quoted('CONFIG_HOST_DSOSUF', host_dsosuf)
 config_host_data.set('HAVE_HOST_BLOCK_DEVICE', have_host_block_device)
 config_host_data.set('HOST_WORDS_BIGENDIAN', host_machine.endian() == 'big')
-
-have_coroutine_pool = get_option('coroutine_pool')
-if get_option('debug_stack_usage') and have_coroutine_pool
-  message('Disabling coroutine pool to measure stack usage')
-  have_coroutine_pool = false
-endif
-config_host_data.set10('CONFIG_COROUTINE_POOL', have_coroutine_pool)
-config_host_data.set('CONFIG_DEBUG_MUTEX', get_option('debug_mutex'))
-config_host_data.set('CONFIG_DEBUG_STACK_USAGE', get_option('debug_stack_usage'))
-config_host_data.set('CONFIG_GPROF', get_option('gprof'))
-config_host_data.set('CONFIG_LIVE_BLOCK_MIGRATION', get_option('live_block_migration').allowed())
-config_host_data.set('CONFIG_QOM_CAST_DEBUG', get_option('qom_cast_debug'))
-config_host_data.set('CONFIG_REPLICATION', get_option('live_block_migration').allowed())
 
 # has_header
 config_host_data.set('CONFIG_EPOLL', cc.has_header('sys/epoll.h'))
@@ -1766,7 +1672,7 @@ config_host_data.set('HAVE_MLOCKALL', cc.links(gnu_source_prefix + '''
   }'''))
 
 have_l2tpv3 = false
-if get_option('l2tpv3').allowed() and have_system
+if not get_option('l2tpv3').disabled() and have_system
   have_l2tpv3 = cc.has_type('struct mmsghdr',
     prefix: gnu_source_prefix + '''
       #include <sys/socket.h>
@@ -1775,7 +1681,7 @@ endif
 config_host_data.set('CONFIG_L2TPV3', have_l2tpv3)
 
 have_netmap = false
-if get_option('netmap').allowed() and have_system
+if not get_option('netmap').disabled() and have_system
   have_netmap = cc.compiles('''
     #include <inttypes.h>
     #include <net/if.h>
@@ -1832,86 +1738,6 @@ config_host_data.set('CONFIG_GETAUXVAL', cc.links(gnu_source_prefix + '''
     return getauxval(AT_HWCAP) == 0;
   }'''))
 
-have_cpuid_h = cc.links('''
-  #include <cpuid.h>
-  int main(void) {
-    unsigned a, b, c, d;
-    unsigned max = __get_cpuid_max(0, 0);
-
-    if (max >= 1) {
-        __cpuid(1, a, b, c, d);
-    }
-
-    if (max >= 7) {
-        __cpuid_count(7, 0, a, b, c, d);
-    }
-
-    return 0;
-  }''')
-config_host_data.set('CONFIG_CPUID_H', have_cpuid_h)
-
-config_host_data.set('CONFIG_AVX2_OPT', get_option('avx2') \
-  .require(have_cpuid_h, error_message: 'cpuid.h not available, cannot enable AVX2') \
-  .require(cc.links('''
-    #pragma GCC push_options
-    #pragma GCC target("avx2")
-    #include <cpuid.h>
-    #include <immintrin.h>
-    static int bar(void *a) {
-      __m256i x = *(__m256i *)a;
-      return _mm256_testz_si256(x, x);
-    }
-    int main(int argc, char *argv[]) { return bar(argv[0]); }
-  '''), error_message: 'AVX2 not available').allowed())
-
-config_host_data.set('CONFIG_AVX512F_OPT', get_option('avx512f') \
-  .require(have_cpuid_h, error_message: 'cpuid.h not available, cannot enable AVX512F') \
-  .require(cc.links('''
-    #pragma GCC push_options
-    #pragma GCC target("avx512f")
-    #include <cpuid.h>
-    #include <immintrin.h>
-    static int bar(void *a) {
-      __m512i x = *(__m512i *)a;
-      return _mm512_test_epi64_mask(x, x);
-    }
-    int main(int argc, char *argv[]) { return bar(argv[0]); }
-  '''), error_message: 'AVX512F not available').allowed())
-
-if get_option('membarrier').disabled()
-  have_membarrier = false
-elif targetos == 'windows'
-  have_membarrier = true
-elif targetos == 'linux'
-  have_membarrier = cc.compiles('''
-    #include <linux/membarrier.h>
-    #include <sys/syscall.h>
-    #include <unistd.h>
-    #include <stdlib.h>
-    int main(void) {
-        syscall(__NR_membarrier, MEMBARRIER_CMD_QUERY, 0);
-        syscall(__NR_membarrier, MEMBARRIER_CMD_SHARED, 0);
-        exit(0);
-    }''')
-endif
-config_host_data.set('CONFIG_MEMBARRIER', get_option('membarrier') \
-  .require(have_membarrier, error_message: 'membarrier system call not available') \
-  .allowed())
-
-have_afalg = get_option('crypto_afalg') \
-  .require(cc.compiles(gnu_source_prefix + '''
-    #include <errno.h>
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <linux/if_alg.h>
-    int main(void) {
-      int sock;
-      sock = socket(AF_ALG, SOCK_SEQPACKET, 0);
-      return sock;
-    }
-  '''), error_message: 'AF_ALG requested but could not be detected').allowed()
-config_host_data.set('CONFIG_AF_ALG', have_afalg)
-
 config_host_data.set('CONFIG_AF_VSOCK', cc.compiles(gnu_source_prefix + '''
   #include <errno.h>
   #include <sys/types.h>
@@ -1932,33 +1758,10 @@ config_host_data.set('CONFIG_AF_VSOCK', cc.compiles(gnu_source_prefix + '''
     return -1;
   }'''))
 
-have_vss = false
-if targetos == 'windows' and link_language == 'cpp'
-  have_vss = cxx.compiles('''
-    #define __MIDL_user_allocate_free_DEFINED__
-    #include <inc/win2003/vss.h>
-    int main(void) { return VSS_CTX_BACKUP; }''')
-endif
-
-have_ntddscsi = false
-if targetos == 'windows'
-  have_ntddscsi = cc.compiles('''
-    #include <windows.h>
-    #include <ntddscsi.h>
-    int main(void) {
-    #if !defined(IOCTL_SCSI_GET_ADDRESS)
-    #error Missing required ioctl definitions
-    #endif
-      SCSI_ADDRESS addr = { .Lun = 0, .TargetId = 0, .PathId = 0 };
-      return addr.Lun;
-    }
-''')
-endif
-config_host_data.set('HAVE_NTDDSCSI', have_ntddscsi)
-
 ignored = ['CONFIG_QEMU_INTERP_PREFIX', # actually per-target
     'HAVE_GDB_BIN']
 arrays = ['CONFIG_BDRV_RW_WHITELIST', 'CONFIG_BDRV_RO_WHITELIST']
+strings = ['CONFIG_IASL']
 foreach k, v: config_host
   if ignored.contains(k)
     # do nothing
@@ -1967,6 +1770,10 @@ foreach k, v: config_host
       v = '"' + '", "'.join(v.split()) + '", '
     endif
     config_host_data.set(k, v)
+  elif k == 'ARCH'
+    config_host_data.set('HOST_' + v.to_upper(), 1)
+  elif strings.contains(k)
+    config_host_data.set_quoted(k, v)
   elif k.startswith('CONFIG_')
     config_host_data.set(k, v == 'y' ? 1 : v)
   endif
@@ -1994,6 +1801,7 @@ disassemblers = {
   'hppa' : ['CONFIG_HPPA_DIS'],
   'i386' : ['CONFIG_I386_DIS'],
   'x86_64' : ['CONFIG_I386_DIS'],
+  'x32' : ['CONFIG_I386_DIS'],
   'm68k' : ['CONFIG_M68K_DIS'],
   'microblaze' : ['CONFIG_MICROBLAZE_DIS'],
   'mips' : ['CONFIG_MIPS_DIS'],
@@ -2018,7 +1826,7 @@ endif
 have_ivshmem = config_host_data.get('CONFIG_EVENTFD')
 host_kconfig = \
   (get_option('fuzzing') ? ['CONFIG_FUZZ=y'] : []) + \
-  (have_tpm ? ['CONFIG_TPM=y'] : []) + \
+  ('CONFIG_TPM' in config_host ? ['CONFIG_TPM=y'] : []) + \
   (spice.found() ? ['CONFIG_SPICE=y'] : []) + \
   (have_ivshmem ? ['CONFIG_IVSHMEM=y'] : []) + \
   ('CONFIG_OPENGL' in config_host ? ['CONFIG_OPENGL=y'] : []) + \
@@ -2107,7 +1915,7 @@ foreach target : target_dirs
   endif
 
   foreach k, v: disassemblers
-    if host_arch.startswith(k) or config_target['TARGET_BASE_ARCH'].startswith(k)
+    if config_host['ARCH'].startswith(k) or config_target['TARGET_BASE_ARCH'].startswith(k)
       foreach sym: v
         config_target += { sym: 'y' }
         config_all_disas += { sym: 'y' }
@@ -2185,18 +1993,6 @@ config_all += {
   'CONFIG_USER_ONLY': have_user,
   'CONFIG_ALL': true,
 }
-
-target_configs_h = []
-foreach target: target_dirs
-  target_configs_h += config_target_h[target]
-  target_configs_h += config_devices_h.get(target, [])
-endforeach
-genh += custom_target('config-poison.h',
-                      input: [target_configs_h],
-                      output: 'config-poison.h',
-                      capture: true,
-                      command: [find_program('scripts/make-config-poison.sh'),
-                                target_configs_h])
 
 ##############
 # Submodules #
@@ -2429,7 +2225,7 @@ if have_system
     if fdt.found() and cc.links('''
        #include <libfdt.h>
        #include <libfdt_env.h>
-       int main(void) { fdt_find_max_phandle(NULL, NULL); return 0; }''',
+       int main(void) { fdt_check_full(NULL, 0); return 0; }''',
          dependencies: fdt)
       fdt_opt = 'system'
     elif fdt_opt == 'system'
@@ -2510,15 +2306,19 @@ tracetool_depends = files(
   'scripts/tracetool/backend/simple.py',
   'scripts/tracetool/backend/syslog.py',
   'scripts/tracetool/backend/ust.py',
+  'scripts/tracetool/format/tcg_h.py',
   'scripts/tracetool/format/ust_events_c.py',
   'scripts/tracetool/format/ust_events_h.py',
   'scripts/tracetool/format/__init__.py',
   'scripts/tracetool/format/d.py',
+  'scripts/tracetool/format/tcg_helper_c.py',
   'scripts/tracetool/format/simpletrace_stap.py',
   'scripts/tracetool/format/c.py',
   'scripts/tracetool/format/h.py',
+  'scripts/tracetool/format/tcg_helper_h.py',
   'scripts/tracetool/format/log_stap.py',
   'scripts/tracetool/format/stap.py',
+  'scripts/tracetool/format/tcg_helper_wrapper_h.py',
   'scripts/tracetool/__init__.py',
   'scripts/tracetool/transform.py',
   'scripts/tracetool/vcpu.py'
@@ -2563,11 +2363,13 @@ genh += hxdep
 authz_ss = ss.source_set()
 blockdev_ss = ss.source_set()
 block_ss = ss.source_set()
+bsd_user_ss = ss.source_set()
 chardev_ss = ss.source_set()
 common_ss = ss.source_set()
 crypto_ss = ss.source_set()
 hwcore_ss = ss.source_set()
 io_ss = ss.source_set()
+linux_user_ss = ss.source_set()
 qmp_ss = ss.source_set()
 qom_ss = ss.source_set()
 softmmu_ss = ss.source_set()
@@ -2602,11 +2404,8 @@ trace_events_subdirs = [
   'monitor',
   'util',
 ]
-if have_linux_user
+if have_user
   trace_events_subdirs += [ 'linux-user' ]
-endif
-if have_bsd_user
-  trace_events_subdirs += [ 'bsd-user' ]
 endif
 if have_block
   trace_events_subdirs += [
@@ -2706,8 +2505,6 @@ if 'CONFIG_VHOST_USER' in config_host
   vhost_user = libvhost_user.get_variable('vhost_user_dep')
 endif
 
-# NOTE: the trace/ subdirectory needs the qapi_trace_events variable
-# that is filled in by qapi/.
 subdir('qapi')
 subdir('qobject')
 subdir('stubs')
@@ -2755,9 +2552,7 @@ if have_block
     'job.c',
     'qemu-io-cmds.c',
   ))
-  if config_host_data.get('CONFIG_REPLICATION')
-    block_ss.add(files('replication.c'))
-  endif
+  block_ss.add(when: 'CONFIG_REPLICATION', if_true: files('replication.c'))
 
   subdir('nbd')
   subdir('scsi')
@@ -2815,13 +2610,14 @@ subdir('tcg')
 subdir('fpu')
 subdir('accel')
 subdir('plugins')
-subdir('ebpf')
-
-common_user_inc = []
-
-subdir('common-user')
 subdir('bsd-user')
 subdir('linux-user')
+subdir('ebpf')
+
+specific_ss.add_all(when: 'CONFIG_BSD_USER', if_true: bsd_user_ss)
+
+linux_user_ss.add(files('thunk.c'))
+specific_ss.add_all(when: 'CONFIG_LINUX_USER', if_true: linux_user_ss)
 
 # needed for fuzzing binaries
 subdir('tests/qtest/libqos')
@@ -3022,10 +2818,8 @@ common_ss.add(hwcore)
 # Targets #
 ###########
 
-emulator_modules = []
 foreach m : block_mods + softmmu_mods
-  emulator_modules += shared_module(m.name(),
-                build_by_default: true,
+  shared_module(m.name(),
                 name_prefix: '',
                 link_whole: m,
                 install: true,
@@ -3042,7 +2836,6 @@ common_all = common_ss.apply(config_all, strict: false)
 common_all = static_library('common',
                             build_by_default: false,
                             sources: common_all.sources() + genh,
-                            include_directories: common_user_inc,
                             implicit_include_directories: false,
                             dependencies: common_all.dependencies(),
                             name_suffix: 'fa')
@@ -3053,7 +2846,7 @@ emulators = {}
 foreach target : target_dirs
   config_target = config_target_mak[target]
   target_name = config_target['TARGET_NAME']
-  target_base_arch = config_target['TARGET_BASE_ARCH']
+  arch = config_target['TARGET_BASE_ARCH']
   arch_srcs = [config_target_h[target]]
   arch_deps = []
   c_args = ['-DNEED_CPU_H',
@@ -3069,11 +2862,11 @@ foreach target : target_dirs
   if target.endswith('-softmmu')
     qemu_target_name = 'qemu-system-' + target_name
     target_type='system'
-    t = target_softmmu_arch[target_base_arch].apply(config_target, strict: false)
+    t = target_softmmu_arch[arch].apply(config_target, strict: false)
     arch_srcs += t.sources()
     arch_deps += t.dependencies()
 
-    hw_dir = target_name == 'sparc64' ? 'sparc64' : target_base_arch
+    hw_dir = target_name == 'sparc64' ? 'sparc64' : arch
     hw = hw_arch[hw_dir].apply(config_target, strict: false)
     arch_srcs += hw.sources()
     arch_deps += hw.dependencies()
@@ -3083,22 +2876,21 @@ foreach target : target_dirs
   else
     abi = config_target['TARGET_ABI_DIR']
     target_type='user'
-    target_inc += common_user_inc
     qemu_target_name = 'qemu-' + target_name
-    if target_base_arch in target_user_arch
-      t = target_user_arch[target_base_arch].apply(config_target, strict: false)
+    if arch in target_user_arch
+      t = target_user_arch[arch].apply(config_target, strict: false)
       arch_srcs += t.sources()
       arch_deps += t.dependencies()
     endif
     if 'CONFIG_LINUX_USER' in config_target
       base_dir = 'linux-user'
+      target_inc += include_directories('linux-user/host/' / config_host['ARCH'])
     endif
     if 'CONFIG_BSD_USER' in config_target
       base_dir = 'bsd-user'
       target_inc += include_directories('bsd-user/' / targetos)
-      target_inc += include_directories('bsd-user/host/' / host_arch)
       dir = base_dir / abi
-      arch_srcs += files(dir / 'signal.c', dir / 'target_arch_cpu.c')
+      arch_srcs += files(dir / 'target_arch_cpu.c')
     endif
     target_inc += include_directories(
       base_dir,
@@ -3124,7 +2916,7 @@ foreach target : target_dirs
     arch_srcs += gdbstub_xml
   endif
 
-  t = target_arch[target_base_arch].apply(config_target, strict: false)
+  t = target_arch[arch].apply(config_target, strict: false)
   arch_srcs += t.sources()
   arch_deps += t.dependencies()
 
@@ -3206,14 +2998,17 @@ foreach target : target_dirs
         install_input += meson.current_source_dir() / entitlements
       endif
 
-      entitlement = find_program('scripts/entitlement.sh')
       emulators += {exe['name'] : custom_target(exe['name'],
                    input: build_input,
                    output: exe['name'],
-                   command: [entitlement, '@OUTPUT@', '@INPUT@'])
+                   command: [
+                     files('scripts/entitlement.sh'),
+                     '@OUTPUT@',
+                     '@INPUT@'
+                   ])
       }
 
-      meson.add_install_script(entitlement, '--install',
+      meson.add_install_script('scripts/entitlement.sh', '--install',
                                get_option('bindir') / exe['name'],
                                install_input)
     else
@@ -3252,7 +3047,11 @@ if 'CONFIG_PLUGIN' in config_host
   install_headers('include/qemu/qemu-plugin.h')
 endif
 
-subdir('qga')
+if 'CONFIG_GUEST_AGENT' in config_host
+  subdir('qga')
+elif get_option('guest_agent_msi').enabled()
+  error('Guest agent MSI requested, but the guest agent is not being built')
+endif
 
 # Don't build qemu-keymap if xkbcommon is not explicitly enabled
 # when we don't build tools or system
@@ -3374,17 +3173,12 @@ summary_info += {'sphinx-build':      sphinx_build}
 if config_host.has_key('HAVE_GDB_BIN')
   summary_info += {'gdb':             config_host['HAVE_GDB_BIN']}
 endif
-if get_option('iasl') != ''
-  summary_info += {'iasl':            get_option('iasl')}
-else
-  summary_info += {'iasl':            false}
-endif
 summary_info += {'genisoimage':       config_host['GENISOIMAGE']}
-if targetos == 'windows' and have_ga
+if targetos == 'windows' and config_host.has_key('CONFIG_GUEST_AGENT')
   summary_info += {'wixl':            wixl}
 endif
-if slirp_opt != 'disabled' and have_system
-  summary_info += {'smbd':            have_slirp_smbd ? smbd_path : false}
+if slirp_opt != 'disabled' and 'CONFIG_SLIRP_SMBD' in config_host
+  summary_info += {'smbd':            config_host['CONFIG_SMBD_COMMAND']}
 endif
 summary(summary_info, bool_yn: true, section: 'Host binaries')
 
@@ -3407,8 +3201,7 @@ summary_info += {'Trace backends':    ','.join(get_option('trace_backends'))}
 if 'simple' in get_option('trace_backends')
   summary_info += {'Trace output file': get_option('trace_file') + '-<pid>'}
 endif
-summary_info += {'D-Bus display':     dbus_display}
-summary_info += {'QOM debugging':     get_option('qom_cast_debug')}
+summary_info += {'QOM debugging':     config_host.has_key('CONFIG_QOM_CAST_DEBUG')}
 summary_info += {'vhost-kernel support': config_host.has_key('CONFIG_VHOST_KERNEL')}
 summary_info += {'vhost-net support': config_host.has_key('CONFIG_VHOST_NET')}
 summary_info += {'vhost-crypto support': config_host.has_key('CONFIG_VHOST_CRYPTO')}
@@ -3418,7 +3211,7 @@ summary_info += {'vhost-user support': config_host.has_key('CONFIG_VHOST_USER')}
 summary_info += {'vhost-user-blk server support': have_vhost_user_blk_server}
 summary_info += {'vhost-user-fs support': config_host.has_key('CONFIG_VHOST_USER_FS')}
 summary_info += {'vhost-vdpa support': config_host.has_key('CONFIG_VHOST_VDPA')}
-summary_info += {'build guest agent': have_ga}
+summary_info += {'build guest agent': config_host.has_key('CONFIG_GUEST_AGENT')}
 summary(summary_info, bool_yn: true, section: 'Configurable features')
 
 # Compilation information
@@ -3435,6 +3228,11 @@ endif
 if targetos == 'darwin'
   summary_info += {'Objective-C compiler': ' '.join(meson.get_compiler('objc').cmd_array())}
 endif
+if targetos == 'windows'
+  if 'WIN_SDK' in config_host
+    summary_info += {'Windows SDK':   config_host['WIN_SDK']}
+  endif
+endif
 summary_info += {'CFLAGS':            ' '.join(get_option('c_args')
                                                + ['-O' + get_option('optimization')]
                                                + (get_option('debug') ? ['-g'] : []))}
@@ -3449,18 +3247,18 @@ if link_args.length() > 0
 endif
 summary_info += {'QEMU_CFLAGS':       config_host['QEMU_CFLAGS']}
 summary_info += {'QEMU_LDFLAGS':      config_host['QEMU_LDFLAGS']}
-summary_info += {'profiler':          get_option('profiler')}
+summary_info += {'profiler':          config_host.has_key('CONFIG_PROFILER')}
 summary_info += {'link-time optimization (LTO)': get_option('b_lto')}
 summary_info += {'PIE':               get_option('b_pie')}
 summary_info += {'static build':      config_host.has_key('CONFIG_STATIC')}
 summary_info += {'malloc trim support': has_malloc_trim}
-summary_info += {'membarrier':        have_membarrier}
-summary_info += {'debug stack usage': get_option('debug_stack_usage')}
-summary_info += {'mutex debugging':   get_option('debug_mutex')}
+summary_info += {'membarrier':        config_host.has_key('CONFIG_MEMBARRIER')}
+summary_info += {'debug stack usage': config_host.has_key('CONFIG_DEBUG_STACK_USAGE')}
+summary_info += {'mutex debugging':   config_host.has_key('CONFIG_DEBUG_MUTEX')}
 summary_info += {'memory allocator':  get_option('malloc')}
-summary_info += {'avx2 optimization': config_host_data.get('CONFIG_AVX2_OPT')}
-summary_info += {'avx512f optimization': config_host_data.get('CONFIG_AVX512F_OPT')}
-summary_info += {'gprof enabled':     get_option('gprof')}
+summary_info += {'avx2 optimization': config_host.has_key('CONFIG_AVX2_OPT')}
+summary_info += {'avx512f optimization': config_host.has_key('CONFIG_AVX512F_OPT')}
+summary_info += {'gprof enabled':     config_host.has_key('CONFIG_GPROF')}
 summary_info += {'gcov':              get_option('b_coverage')}
 summary_info += {'thread sanitizer':  config_host.has_key('CONFIG_TSAN')}
 summary_info += {'CFI support':       get_option('cfi')}
@@ -3523,23 +3321,23 @@ summary(summary_info, bool_yn: true, section: 'Targets and accelerators')
 # Block layer
 summary_info = {}
 summary_info += {'coroutine backend': config_host['CONFIG_COROUTINE_BACKEND']}
-summary_info += {'coroutine pool':    have_coroutine_pool}
+summary_info += {'coroutine pool':    config_host['CONFIG_COROUTINE_POOL'] == '1'}
 if have_block
   summary_info += {'Block whitelist (rw)': config_host['CONFIG_BDRV_RW_WHITELIST']}
   summary_info += {'Block whitelist (ro)': config_host['CONFIG_BDRV_RO_WHITELIST']}
-  summary_info += {'Use block whitelist in tools': get_option('block_drv_whitelist_in_tools')}
+  summary_info += {'Use block whitelist in tools': config_host.has_key('CONFIG_BDRV_WHITELIST_TOOLS')}
   summary_info += {'VirtFS support':    have_virtfs}
   summary_info += {'build virtiofs daemon': have_virtiofsd}
-  summary_info += {'Live block migration': config_host_data.get('CONFIG_LIVE_BLOCK_MIGRATION')}
-  summary_info += {'replication support': config_host_data.get('CONFIG_REPLICATION')}
-  summary_info += {'bochs support':     get_option('bochs').allowed()}
-  summary_info += {'cloop support':     get_option('cloop').allowed()}
-  summary_info += {'dmg support':       get_option('dmg').allowed()}
-  summary_info += {'qcow v1 support':   get_option('qcow1').allowed()}
-  summary_info += {'vdi support':       get_option('vdi').allowed()}
-  summary_info += {'vvfat support':     get_option('vvfat').allowed()}
-  summary_info += {'qed support':       get_option('qed').allowed()}
-  summary_info += {'parallels support': get_option('parallels').allowed()}
+  summary_info += {'Live block migration': config_host.has_key('CONFIG_LIVE_BLOCK_MIGRATION')}
+  summary_info += {'replication support': config_host.has_key('CONFIG_REPLICATION')}
+  summary_info += {'bochs support':     config_host.has_key('CONFIG_BOCHS')}
+  summary_info += {'cloop support':     config_host.has_key('CONFIG_CLOOP')}
+  summary_info += {'dmg support':       config_host.has_key('CONFIG_DMG')}
+  summary_info += {'qcow v1 support':   config_host.has_key('CONFIG_QCOW1')}
+  summary_info += {'vdi support':       config_host.has_key('CONFIG_VDI')}
+  summary_info += {'vvfat support':     config_host.has_key('CONFIG_VVFAT')}
+  summary_info += {'qed support':       config_host.has_key('CONFIG_QED')}
+  summary_info += {'parallels support': config_host.has_key('CONFIG_PARALLELS')}
   summary_info += {'FUSE exports':      fuse}
 endif
 summary(summary_info, bool_yn: true, section: 'Block layer support')
@@ -3556,8 +3354,8 @@ summary_info += {'nettle':            nettle}
 if nettle.found()
    summary_info += {'  XTS':             xts != 'private'}
 endif
-summary_info += {'AF_ALG support':    have_afalg}
-summary_info += {'rng-none':          get_option('rng_none')}
+summary_info += {'crypto afalg':      config_host.has_key('CONFIG_AF_ALG')}
+summary_info += {'rng-none':          config_host.has_key('CONFIG_RNG_NONE')}
 summary_info += {'Linux keyring':     config_host.has_key('CONFIG_SECRET_KEYRING')}
 summary(summary_info, bool_yn: true, section: 'Crypto')
 
@@ -3614,6 +3412,7 @@ if spice_protocol.found()
   summary_info += {'  spice server support': spice}
 endif
 summary_info += {'rbd support':       rbd}
+summary_info += {'xfsctl support':    config_host.has_key('CONFIG_XFS')}
 summary_info += {'smartcard support': cacard}
 summary_info += {'U2F support':       u2f}
 summary_info += {'libusb':            libusb}
@@ -3623,21 +3422,22 @@ summary_info += {'GBM':               gbm}
 summary_info += {'libiscsi support':  libiscsi}
 summary_info += {'libnfs support':    libnfs}
 if targetos == 'windows'
-  if have_ga
-    summary_info += {'QGA VSS support':   have_qga_vss}
-    summary_info += {'QGA w32 disk info': have_ntddscsi}
+  if config_host.has_key('CONFIG_GUEST_AGENT')
+    summary_info += {'QGA VSS support':   config_host.has_key('CONFIG_QGA_VSS')}
+    summary_info += {'QGA w32 disk info': config_host.has_key('CONFIG_QGA_NTDDSCSI')}
   endif
 endif
 summary_info += {'seccomp support':   seccomp}
 summary_info += {'GlusterFS support': glusterfs}
-summary_info += {'TPM support':       have_tpm}
-summary_info += {'libssh support':    libssh}
+summary_info += {'TPM support':       config_host.has_key('CONFIG_TPM')}
+summary_info += {'libssh support':    config_host.has_key('CONFIG_LIBSSH')}
 summary_info += {'lzo support':       lzo}
 summary_info += {'snappy support':    snappy}
 summary_info += {'bzip2 support':     libbzip2}
 summary_info += {'lzfse support':     liblzfse}
 summary_info += {'zstd support':      zstd}
-summary_info += {'NUMA host support': numa}
+summary_info += {'NUMA host support': config_host.has_key('CONFIG_NUMA')}
+summary_info += {'libxml2':           libxml2}
 summary_info += {'capstone':          capstone_opt == 'internal' ? capstone_opt : capstone}
 summary_info += {'libpmem support':   libpmem}
 summary_info += {'libdaxctl support': libdaxctl}

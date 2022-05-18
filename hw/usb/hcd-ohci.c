@@ -452,8 +452,7 @@ static inline int get_dwords(OHCIState *ohci,
     addr += ohci->localmem_base;
 
     for (i = 0; i < num; i++, buf++, addr += sizeof(*buf)) {
-        if (dma_memory_read(ohci->as, addr,
-                            buf, sizeof(*buf), MEMTXATTRS_UNSPECIFIED)) {
+        if (dma_memory_read(ohci->as, addr, buf, sizeof(*buf))) {
             return -1;
         }
         *buf = le32_to_cpu(*buf);
@@ -472,8 +471,7 @@ static inline int put_dwords(OHCIState *ohci,
 
     for (i = 0; i < num; i++, buf++, addr += sizeof(*buf)) {
         uint32_t tmp = cpu_to_le32(*buf);
-        if (dma_memory_write(ohci->as, addr,
-                             &tmp, sizeof(tmp), MEMTXATTRS_UNSPECIFIED)) {
+        if (dma_memory_write(ohci->as, addr, &tmp, sizeof(tmp))) {
             return -1;
         }
     }
@@ -490,8 +488,7 @@ static inline int get_words(OHCIState *ohci,
     addr += ohci->localmem_base;
 
     for (i = 0; i < num; i++, buf++, addr += sizeof(*buf)) {
-        if (dma_memory_read(ohci->as, addr,
-                            buf, sizeof(*buf), MEMTXATTRS_UNSPECIFIED)) {
+        if (dma_memory_read(ohci->as, addr, buf, sizeof(*buf))) {
             return -1;
         }
         *buf = le16_to_cpu(*buf);
@@ -510,8 +507,7 @@ static inline int put_words(OHCIState *ohci,
 
     for (i = 0; i < num; i++, buf++, addr += sizeof(*buf)) {
         uint16_t tmp = cpu_to_le16(*buf);
-        if (dma_memory_write(ohci->as, addr,
-                             &tmp, sizeof(tmp), MEMTXATTRS_UNSPECIFIED)) {
+        if (dma_memory_write(ohci->as, addr, &tmp, sizeof(tmp))) {
             return -1;
         }
     }
@@ -541,8 +537,8 @@ static inline int ohci_read_iso_td(OHCIState *ohci,
 static inline int ohci_read_hcca(OHCIState *ohci,
                                  dma_addr_t addr, struct ohci_hcca *hcca)
 {
-    return dma_memory_read(ohci->as, addr + ohci->localmem_base, hcca,
-                           sizeof(*hcca), MEMTXATTRS_UNSPECIFIED);
+    return dma_memory_read(ohci->as, addr + ohci->localmem_base,
+                           hcca, sizeof(*hcca));
 }
 
 static inline int ohci_put_ed(OHCIState *ohci,
@@ -576,7 +572,7 @@ static inline int ohci_put_hcca(OHCIState *ohci,
     return dma_memory_write(ohci->as,
                             addr + ohci->localmem_base + HCCA_WRITEBACK_OFFSET,
                             (char *)hcca + HCCA_WRITEBACK_OFFSET,
-                            HCCA_WRITEBACK_SIZE, MEMTXATTRS_UNSPECIFIED);
+                            HCCA_WRITEBACK_SIZE);
 }
 
 /* Read/Write the contents of a TD from/to main memory.  */
@@ -590,8 +586,7 @@ static int ohci_copy_td(OHCIState *ohci, struct ohci_td *td,
     if (n > len)
         n = len;
 
-    if (dma_memory_rw(ohci->as, ptr + ohci->localmem_base, buf,
-                      n, dir, MEMTXATTRS_UNSPECIFIED)) {
+    if (dma_memory_rw(ohci->as, ptr + ohci->localmem_base, buf, n, dir)) {
         return -1;
     }
     if (n == len) {
@@ -600,7 +595,7 @@ static int ohci_copy_td(OHCIState *ohci, struct ohci_td *td,
     ptr = td->be & ~0xfffu;
     buf += n;
     if (dma_memory_rw(ohci->as, ptr + ohci->localmem_base, buf,
-                      len - n, dir, MEMTXATTRS_UNSPECIFIED)) {
+                      len - n, dir)) {
         return -1;
     }
     return 0;
@@ -618,8 +613,7 @@ static int ohci_copy_iso_td(OHCIState *ohci,
     if (n > len)
         n = len;
 
-    if (dma_memory_rw(ohci->as, ptr + ohci->localmem_base, buf,
-                      n, dir, MEMTXATTRS_UNSPECIFIED)) {
+    if (dma_memory_rw(ohci->as, ptr + ohci->localmem_base, buf, n, dir)) {
         return -1;
     }
     if (n == len) {
@@ -628,7 +622,7 @@ static int ohci_copy_iso_td(OHCIState *ohci,
     ptr = end_addr & ~0xfffu;
     buf += n;
     if (dma_memory_rw(ohci->as, ptr + ohci->localmem_base, buf,
-                      len - n, dir, MEMTXATTRS_UNSPECIFIED)) {
+                      len - n, dir)) {
         return -1;
     }
     return 0;

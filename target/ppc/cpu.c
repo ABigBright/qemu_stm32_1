@@ -112,7 +112,7 @@ static inline void fpscr_set_rounding_mode(CPUPPCState *env)
 
 void ppc_store_fpscr(CPUPPCState *env, target_ulong val)
 {
-    val &= FPSCR_MTFS_MASK;
+    val &= ~(FP_VX | FP_FEX);
     if (val & FPSCR_IX) {
         val |= FP_VX;
     }

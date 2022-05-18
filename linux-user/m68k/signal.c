@@ -353,11 +353,11 @@ long do_sigreturn(CPUM68KState *env)
     restore_sigcontext(env, &frame->sc);
 
     unlock_user_struct(frame, frame_addr, 0);
-    return -QEMU_ESIGRETURN;
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     force_sig(TARGET_SIGSEGV);
-    return -QEMU_ESIGRETURN;
+    return -TARGET_QEMU_ESIGRETURN;
 }
 
 long do_rt_sigreturn(CPUM68KState *env)
@@ -381,12 +381,12 @@ long do_rt_sigreturn(CPUM68KState *env)
     target_restore_altstack(&frame->uc.tuc_stack, env);
 
     unlock_user_struct(frame, frame_addr, 0);
-    return -QEMU_ESIGRETURN;
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     unlock_user_struct(frame, frame_addr, 0);
     force_sig(TARGET_SIGSEGV);
-    return -QEMU_ESIGRETURN;
+    return -TARGET_QEMU_ESIGRETURN;
 }
 
 void setup_sigtramp(abi_ulong sigtramp_page)

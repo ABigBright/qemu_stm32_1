@@ -27,7 +27,8 @@
 void cpu_loop(CPUAlphaState *env)
 {
     CPUState *cs = env_cpu(env);
-    int trapnr, si_code;
+    int trapnr;
+    target_siginfo_t info;
     abi_long sysret;
 
     while (1) {
@@ -55,10 +56,18 @@ void cpu_loop(CPUAlphaState *env)
             break;
         case EXCP_OPCDEC:
         do_sigill:
-            force_sig_fault(TARGET_SIGILL, TARGET_ILL_ILLOPC, env->pc);
+            info.si_signo = TARGET_SIGILL;
+            info.si_errno = 0;
+            info.si_code = TARGET_ILL_ILLOPC;
+            info._sifields._sigfault._addr = env->pc;
+            queue_signal(env, info.si_signo, QEMU_SI_FAULT, &info);
             break;
         case EXCP_ARITH:
-            force_sig_fault(TARGET_SIGFPE, TARGET_FPE_FLTINV, env->pc);
+            info.si_signo = TARGET_SIGFPE;
+            info.si_errno = 0;
+            info.si_code = TARGET_FPE_FLTINV;
+            info._sifields._sigfault._addr = env->pc;
+            queue_signal(env, info.si_signo, QEMU_SI_FAULT, &info);
             break;
         case EXCP_FEN:
             /* No-op.  Linux simply re-enables the FPU.  */
@@ -67,10 +76,20 @@ void cpu_loop(CPUAlphaState *env)
             switch (env->error_code) {
             case 0x80:
                 /* BPT */
-                goto do_sigtrap_brkpt;
+                info.si_signo = TARGET_SIGTRAP;
+                info.si_errno = 0;
+                info.si_code = TARGET_TRAP_BRKPT;
+                info._sifields._sigfault._addr = env->pc;
+                queue_signal(env, info.si_signo, QEMU_SI_FAULT, &info);
+                break;
             case 0x81:
                 /* BUGCHK */
-                goto do_sigtrap_unk;
+                info.si_signo = TARGET_SIGTRAP;
+                info.si_errno = 0;
+                info.si_code = 0;
+                info._sifields._sigfault._addr = env->pc;
+                queue_signal(env, info.si_signo, QEMU_SI_FAULT, &info);
+                break;
             case 0x83:
                 /* CALLSYS */
                 trapnr = env->ir[IR_V0];
@@ -79,11 +98,11 @@ void cpu_loop(CPUAlphaState *env)
                                     env->ir[IR_A2], env->ir[IR_A3],
                                     env->ir[IR_A4], env->ir[IR_A5],
                                     0, 0);
-                if (sysret == -QEMU_ERESTARTSYS) {
+                if (sysret == -TARGET_ERESTARTSYS) {
                     env->pc -= 4;
                     break;
                 }
-                if (sysret == -QEMU_ESIGRETURN) {
+                if (sysret == -TARGET_QEMU_ESIGRETURN) {
                     break;
                 }
                 /* Syscall writes 0 to V0 to bypass error check, similar
@@ -111,43 +130,47 @@ void cpu_loop(CPUAlphaState *env)
                 abort();
             case 0xAA:
                 /* GENTRAP */
+                info.si_signo = TARGET_SIGFPE;
                 switch (env->ir[IR_A0]) {
                 case TARGET_GEN_INTOVF:
-                    si_code = TARGET_FPE_INTOVF;
+                    info.si_code = TARGET_FPE_INTOVF;
                     break;
                 case TARGET_GEN_INTDIV:
-                    si_code = TARGET_FPE_INTDIV;
+                    info.si_code = TARGET_FPE_INTDIV;
                     break;
                 case TARGET_GEN_FLTOVF:
-                    si_code = TARGET_FPE_FLTOVF;
+                    info.si_code = TARGET_FPE_FLTOVF;
                     break;
                 case TARGET_GEN_FLTUND:
-                    si_code = TARGET_FPE_FLTUND;
+                    info.si_code = TARGET_FPE_FLTUND;
                     break;
                 case TARGET_GEN_FLTINV:
-                    si_code = TARGET_FPE_FLTINV;
+                    info.si_code = TARGET_FPE_FLTINV;
                     break;
                 case TARGET_GEN_FLTINE:
-                    si_code = TARGET_FPE_FLTRES;
+                    info.si_code = TARGET_FPE_FLTRES;
                     break;
                 case TARGET_GEN_ROPRAND:
-                    si_code = TARGET_FPE_FLTUNK;
+                    info.si_code = 0;
                     break;
                 default:
-                    goto do_sigtrap_unk;
+                    info.si_signo = TARGET_SIGTRAP;
+                    info.si_code = 0;
+                    break;
                 }
-                force_sig_fault(TARGET_SIGFPE, si_code, env->pc);
+                info.si_errno = 0;
+                info._sifields._sigfault._addr = env->pc;
+                queue_signal(env, info.si_signo, QEMU_SI_FAULT, &info);
                 break;
             default:
                 goto do_sigill;
             }
             break;
         case EXCP_DEBUG:
-        do_sigtrap_brkpt:
-            force_sig_fault(TARGET_SIGTRAP, TARGET_TRAP_BRKPT, env->pc);
-            break;
-        do_sigtrap_unk:
-            force_sig_fault(TARGET_SIGTRAP, TARGET_TRAP_UNK, env->pc);
+            info.si_signo = TARGET_SIGTRAP;
+            info.si_errno = 0;
+            info.si_code = TARGET_TRAP_BRKPT;
+            queue_signal(env, info.si_signo, QEMU_SI_FAULT, &info);
             break;
         case EXCP_INTERRUPT:
             /* Just indicate that signals should be handled asap.  */

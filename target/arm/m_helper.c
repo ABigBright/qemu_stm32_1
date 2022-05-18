@@ -19,7 +19,6 @@
 #include "qemu/bitops.h"
 #include "qemu/crc32c.h"
 #include "qemu/qemu-print.h"
-#include "qemu/log.h"
 #include "exec/exec-all.h"
 #include <zlib.h> /* For crc32 */
 #include "semihosting/semihost.h"
@@ -2207,7 +2206,7 @@ void arm_v7m_cpu_do_interrupt(CPUState *cs)
     uint32_t lr;
     bool ignore_stackfaults;
 
-    arm_log_exception(cs);
+    arm_log_exception(cs->exception_index);
 
     /*
      * For exceptions we just mark as pending on the NVIC, and let that
