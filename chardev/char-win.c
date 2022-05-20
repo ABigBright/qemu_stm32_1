@@ -110,7 +110,7 @@ int win_chr_serial_init(Chardev *chr, const char *filename, Error **errp)
     size = sizeof(COMMCONFIG);
     GetDefaultCommConfig(filename, &comcfg, &size);
     comcfg.dcb.DCBlength = sizeof(DCB);
-    CommConfigDialog(filename, NULL, &comcfg);
+    //CommConfigDialog(filename, NULL, &comcfg);
 
     if (!SetCommState(s->file, &comcfg.dcb)) {
         error_setg(errp, "Failed SetCommState");

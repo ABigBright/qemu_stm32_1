@@ -17,7 +17,7 @@ flags="$(./configure --help | perl -ne 'print if s/^  ([a-z][\w-]*) .*/\1/' | ta
 
 ${2:-.}/configure --target-list=$target --extra-cflags=-fPIC --disable-slirp $flags --enable-tcg \
 	--enable-system --disable-werror --disable-alsa  \
-        --enable-debug --enable-debug-tcg --enable-debug-info \
+        --enable-debug --enable-debug-info \
         --enable-gcrypt --enable-slirp 
 	#--enable-gtk
 
