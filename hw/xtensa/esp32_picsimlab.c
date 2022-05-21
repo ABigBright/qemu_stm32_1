@@ -84,7 +84,7 @@ static const struct MemmapEntry {
 
 static Esp32SocState *global_s = NULL;
 
-static qemu_irq *pout_irq; //TODO alloc thin in object state
+static qemu_irq *pout_irq; //TODO alloc this in object state
 static qemu_irq pin_irq[100];
 
 //prototypes
@@ -93,6 +93,7 @@ void qemu_picsimlab_set_apin(int chn,int value);
 void qemu_picsimlab_set_pin(int pin,int value);
 uint32_t * qemu_picsimlab_get_strap(void);
 uint32_t  qemu_picsimlab_get_TIOCM(void);
+int qemu_picsimlab_flash_dump( int64_t offset, void *buf, int bytes);
 
 
 uint32_t * qemu_picsimlab_get_strap(void)
@@ -132,6 +133,14 @@ void qemu_picsimlab_set_pin(int pin,int value)
 void qemu_picsimlab_set_apin(int chn,int value)
 {
    //ADC_values[chn] = value;
+}
+
+int qemu_picsimlab_flash_dump( int64_t offset, void *buf, int bytes)
+{
+    if (global_s->dport.flash_blk){
+       return blk_pread(global_s->dport.flash_blk,offset,buf,bytes);
+    }
+   return 0;
 }
 
 static void
