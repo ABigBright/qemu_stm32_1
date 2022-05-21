@@ -55,6 +55,7 @@ void qemu_picsimlab_set_apin(int chn,int value);
 void qemu_picsimlab_set_pin(int pin,int value);
 uint32_t * qemu_picsimlab_get_strap(void);
 uint32_t  qemu_picsimlab_get_TIOCM(void);
+int qemu_picsimlab_flash_dump( int64_t offset, void *buf, int bytes);
 
 uint32_t * qemu_picsimlab_get_strap(void)
 {
@@ -93,6 +94,12 @@ void qemu_picsimlab_set_pin(int pin,int value)
 void qemu_picsimlab_set_apin(int chn,int value)
 {
    ADC_values[chn] = value;
+}
+
+int qemu_picsimlab_flash_dump( int64_t offset, void *buf, int bytes)
+{
+   cpu_physical_memory_read(0x8000000 + offset, buf, bytes);
+   return bytes;
 }
 
 static void
