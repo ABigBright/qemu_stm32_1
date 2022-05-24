@@ -36,26 +36,45 @@ static void win_chr_read(Chardev *chr, DWORD len)
     uint8_t buf[CHR_READ_BUF_LEN];
     DWORD size;
 
-    if (len > max_size) {
-        len = max_size;
-    }
-    if (len == 0) {
-        return;
-    }
+    if(max_size > 0 ){
+      if (len > max_size) {
+          len = max_size;
+      }
+      if (len == 0) {
+          return;
+      }
 
-    ZeroMemory(&s->orecv, sizeof(s->orecv));
-    s->orecv.hEvent = s->hrecv;
-    ret = ReadFile(s->file, buf, len, &size, &s->orecv);
-    if (!ret) {
-        err = GetLastError();
-        if (err == ERROR_IO_PENDING) {
+      ZeroMemory(&s->orecv, sizeof(s->orecv));
+      s->orecv.hEvent = s->hrecv;
+      ret = ReadFile(s->file, buf, len, &size, &s->orecv);
+      if (!ret) {
+          err = GetLastError();
+          if (err == ERROR_IO_PENDING) {
             ret = GetOverlappedResult(s->file, &s->orecv, &size, TRUE);
-        }
-    }
+          }
+      }
 
-    if (size > 0) {
-        qemu_chr_be_write(chr, buf, size);
-    }
+      if (size > 0) {
+          qemu_chr_be_write(chr, buf, size);
+      }
+   }else{
+   //discard
+      if (len == 0) {
+          return;
+      }
+      if (len > CHR_READ_BUF_LEN) {
+          len = CHR_READ_BUF_LEN;
+      }
+      ZeroMemory(&s->orecv, sizeof(s->orecv));
+      s->orecv.hEvent = s->hrecv;
+      ret = ReadFile(s->file, buf, len, &size, &s->orecv);
+      if (!ret) {
+          err = GetLastError();
+          if (err == ERROR_IO_PENDING) {
+            ret = GetOverlappedResult(s->file, &s->orecv, &size, TRUE);
+          }
+      }
+  }
 }
 
 static int win_chr_serial_poll(void *opaque)
