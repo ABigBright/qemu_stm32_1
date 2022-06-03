@@ -31,63 +31,48 @@
 static void win_chr_read(Chardev *chr, DWORD len)
 {
     WinChardev *s = WIN_CHARDEV(chr);
-    int max_size = qemu_chr_be_can_write(chr);
     int ret, err;
     uint8_t buf[CHR_READ_BUF_LEN];
     DWORD size;
 
-    if(max_size > 0 ){
-      if (len > max_size) {
-          len = max_size;
-      }
-      if (len == 0) {
-          return;
-      }
+    if (len > s->max_size) {
+        len = s->max_size;
+    }
+    if (len == 0) {
+        return;
+    }
 
-      ZeroMemory(&s->orecv, sizeof(s->orecv));
-      s->orecv.hEvent = s->hrecv;
-      ret = ReadFile(s->file, buf, len, &size, &s->orecv);
-      if (!ret) {
-          err = GetLastError();
-          if (err == ERROR_IO_PENDING) {
+    ZeroMemory(&s->orecv, sizeof(s->orecv));
+    s->orecv.hEvent = s->hrecv;
+    ret = ReadFile(s->file, buf, len, &size, &s->orecv);
+    if (!ret) {
+        err = GetLastError();
+        if (err == ERROR_IO_PENDING) {
             ret = GetOverlappedResult(s->file, &s->orecv, &size, TRUE);
-          }
-      }
+        }
+    }
 
-      if (size > 0) {
-          qemu_chr_be_write(chr, buf, size);
-      }
-   }else{
-   //discard
-      if (len == 0) {
-          return;
-      }
-      if (len > CHR_READ_BUF_LEN) {
-          len = CHR_READ_BUF_LEN;
-      }
-      ZeroMemory(&s->orecv, sizeof(s->orecv));
-      s->orecv.hEvent = s->hrecv;
-      ret = ReadFile(s->file, buf, len, &size, &s->orecv);
-      if (!ret) {
-          err = GetLastError();
-          if (err == ERROR_IO_PENDING) {
-            ret = GetOverlappedResult(s->file, &s->orecv, &size, TRUE);
-          }
-      }
-  }
+    if (size > 0) {
+        qemu_chr_be_write(chr, buf, size);
+    }
 }
 
 static int win_chr_serial_poll(void *opaque)
 {
     Chardev *chr = CHARDEV(opaque);
     WinChardev *s = WIN_CHARDEV(opaque);
-    COMSTAT status;
-    DWORD comerr;
 
-    ClearCommError(s->file, &comerr, &status);
-    if (status.cbInQue > 0) {
-        win_chr_read(chr, status.cbInQue);
-        return 1;
+    s->max_size = qemu_chr_be_can_write(chr);
+
+    if(s->max_size > 0){
+      COMSTAT status;
+      DWORD comerr;
+
+      ClearCommError(s->file, &comerr, &status);
+      if (status.cbInQue > 0) {
+          win_chr_read(chr, status.cbInQue);
+          return 1;
+      }
     }
     return 0;
 }
