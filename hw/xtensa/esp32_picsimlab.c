@@ -37,6 +37,12 @@
 #include "exec/exec-all.h"
 #include "net/net.h"
 #include "elf.h"
+
+#ifdef _WIN32
+#include "chardev/char-win.h"
+#else
+#include "chardev/char-fd.h"
+#endif
 #include "chardev/char-serial.h"
 
 #define TYPE_ESP32_SOC "xtensa.esp32-picsimlab"
@@ -105,9 +111,23 @@ uint32_t qemu_picsimlab_get_TIOCM(void)
 {
    ESP32UARTState *s = ESP32_UART(&(global_s->uart[0]));
 
-   uint32_t state;
-   qemu_chr_fe_ioctl(&s->chr, CHR_IOCTL_SERIAL_GET_TIOCM, &state);
+   uint32_t state = 0;
+#ifdef _WIN32
+   WinChardev *ws = WIN_CHARDEV(s->chr.chr);
 
+   if (ws->file != INVALID_HANDLE_VALUE) {
+     long unsigned int wstate;
+     if(GetCommModemStatus(ws->file, &wstate)){
+       if(wstate & MS_DSR_ON) state |= CHR_TIOCM_DSR;
+       if(wstate & MS_CTS_ON) state |= CHR_TIOCM_CTS;
+     }
+     else{
+       printf("GetCommModemStatus Erro %li\n", GetLastError());
+     }
+    }
+#else
+   qemu_chr_fe_ioctl(&s->chr, CHR_IOCTL_SERIAL_GET_TIOCM, &state); 
+#endif
    return state;
 }
 
