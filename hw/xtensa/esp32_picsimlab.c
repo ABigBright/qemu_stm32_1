@@ -725,8 +725,8 @@ static void esp32_soc_realize(DeviceState *dev, Error **errp)
     qdev_connect_gpio_out_named(DEVICE(&s->gpio), ESP32_GPIOS, 17, pout_irq[28]);
     pin_irq[28]=qdev_get_gpio_in_named(DEVICE(&s->gpio), ESP32_GPIOS_IN, 17);
 //29-GPIO5
-    qdev_connect_gpio_out_named(DEVICE(&s->gpio), ESP32_GPIOS, 15, pout_irq[29]);
-    pin_irq[29]=qdev_get_gpio_in_named(DEVICE(&s->gpio), ESP32_GPIOS_IN, 15);
+    qdev_connect_gpio_out_named(DEVICE(&s->gpio), ESP32_GPIOS, 5, pout_irq[29]);
+    pin_irq[29]=qdev_get_gpio_in_named(DEVICE(&s->gpio), ESP32_GPIOS_IN, 5);
 //30-GPIO18
     qdev_connect_gpio_out_named(DEVICE(&s->gpio), ESP32_GPIOS, 18, pout_irq[30]);
     pin_irq[30]=qdev_get_gpio_in_named(DEVICE(&s->gpio), ESP32_GPIOS_IN, 18);
