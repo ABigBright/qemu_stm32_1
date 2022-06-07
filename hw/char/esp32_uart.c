@@ -47,7 +47,7 @@ static void uart_update_irq(ESP32UARTState *s)
 
     uint32_t tx_empty_raw = (fifo8_num_free(&s->tx_fifo) <= tx_empty_threshold);
     uint32_t rx_full_raw = (fifo8_num_used(&s->rx_fifo) >= rx_full_threshold);
-    uint32_t tx_done_raw = (fifo8_num_used(&s->tx_fifo) == 0);
+    uint32_t tx_done_raw = (fifo8_num_used(&s->tx_fifo) != 0);
     uint32_t rxfifo_tout_raw = (s->rxfifo_tout) ? 1 : 0;
 
     uint32_t int_raw = s->reg[R_UART_INT_RAW];
