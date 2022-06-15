@@ -63,11 +63,13 @@ struct Stm32Gpio {
      * the output should be updated to match the input in this case....
      */
     qemu_irq out_irq[STM32_GPIO_PIN_COUNT];
+    qemu_irq dir_irq[STM32_GPIO_PIN_COUNT];
 
     /* IRQs which relay input pin changes to other STM32 peripherals */
     qemu_irq in_irq[STM32_GPIO_PIN_COUNT];
 };
 
+#define STM32_GPIOS_DIR "stm32_gpios_dir"
 
 
 /* CALLBACKs */
@@ -116,9 +118,10 @@ static uint8_t stm32_gpio_get_pin_config(Stm32Gpio *s, unsigned pin) {
 static void stm32_gpio_update_dir(Stm32Gpio *s, int cr_index)
 {
     unsigned start_pin, pin, pin_dir;
+    uint16_t old_mask, diff;
 
     assert((cr_index == 0) || (cr_index == 1));
-
+    old_mask = s->dir_mask; 
     /* Update the direction mask */
     start_pin = cr_index * 8;
     for(pin=start_pin; pin < start_pin + 8; pin++) {
@@ -129,6 +132,15 @@ static void stm32_gpio_update_dir(Stm32Gpio *s, int cr_index)
         s->dir_mask &= ~(1 << pin);
         s->dir_mask |= (pin_dir ? 1 : 0) << pin;
     }
+
+    diff = old_mask ^ s->dir_mask;
+    for(pin=start_pin ; pin <  start_pin + 8; pin++) {
+       if(diff & (1 << pin)){
+          qemu_set_irq( s->dir_irq[pin],(s->dir_mask & (1 << pin)) ? 1 : 0);
+       }
+    }
+     
+
 }
 
 /* Write the Output Data Register.
@@ -322,6 +334,7 @@ static void stm32_gpio_init(Object *obj)
 
     qdev_init_gpio_in(DEVICE(dev), stm32_gpio_in_trigger, STM32_GPIO_PIN_COUNT);
     qdev_init_gpio_out(DEVICE(dev), s->out_irq, STM32_GPIO_PIN_COUNT);
+    qdev_init_gpio_out_named(DEVICE(dev), s->dir_irq, STM32_GPIOS_DIR, STM32_GPIO_PIN_COUNT);
 
     for(pin = 0; pin < STM32_GPIO_PIN_COUNT; pin++) {
         sysbus_init_irq(dev, &s->in_irq[pin]);
