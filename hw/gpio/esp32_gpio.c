@@ -36,9 +36,11 @@ static uint64_t esp32_gpio_read(void *opaque, hwaddr addr, unsigned int size) {
             r = s->strap_mode;
             break;
         case 0x3C: //GPIO_IN_REG
+            qemu_set_irq(s->gpios_sync[0], 1); //request sync
             r = s->gpio_in;
             break;
         case 0x40: //GPIO_IN1_REG 
+            qemu_set_irq(s->gpios_sync[0], 1); //request sync
             r = s->gpio_in1;
             break;
         case 0x44: //GPIO_STATUS_REG
@@ -260,6 +262,7 @@ static void esp32_gpio_init(Object *obj) {
     qdev_init_gpio_out_named(DEVICE(s), &s->irq, SYSBUS_DEVICE_GPIO_IRQ, 1);
     qdev_init_gpio_out_named(DEVICE(s), s->gpios, ESP32_GPIOS, 32);
     qdev_init_gpio_out_named(DEVICE(s), s->gpios_dir, ESP32_GPIOS_DIR, 32);
+    qdev_init_gpio_out_named(DEVICE(s), s->gpios_sync, ESP32_GPIOS_SYNC, 1);
     qdev_init_gpio_in_named(DEVICE(s), set_gpio, ESP32_GPIOS_IN, 40);
     s->gpio_in = 0x1;
     s->gpio_in1 = 0x8;

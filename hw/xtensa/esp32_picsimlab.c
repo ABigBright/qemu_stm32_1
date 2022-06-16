@@ -92,6 +92,8 @@ static Esp32SocState *global_s = NULL;
 
 static qemu_irq *pout_irq; //TODO alloc this in object state
 static qemu_irq *pdir_irq; //TODO alloc this in object state
+static qemu_irq *psync_irq;
+
 static qemu_irq pin_irq[100];
 
 //prototypes
@@ -178,6 +180,11 @@ pdir_irq_handler(void *opaque, int n, int dir)
    (*picsimlab_dir_pin)(n, dir);
 }
 
+static void
+psync_irq_handler(void *opaque, int n, int dir)
+{
+   (*picsimlab_dir_pin)(-1, 0);
+}
 
 static void remove_cpu_watchpoints(XtensaCPU* xcs)
 {
@@ -662,6 +669,8 @@ static void esp32_soc_realize(DeviceState *dev, Error **errp)
 //PICSimLab gpio map
 
 //ESP32-DevKitC V4
+    psync_irq = qemu_allocate_irqs (psync_irq_handler, NULL, 1);
+    qdev_connect_gpio_out_named(DEVICE(&s->gpio), ESP32_GPIOS_SYNC, 0 , psync_irq[0]);
     pdir_irq = qemu_allocate_irqs (pdir_irq_handler, NULL, 38);
     pout_irq = qemu_allocate_irqs (pout_irq_handler, NULL, 38);
 //1-3V3 

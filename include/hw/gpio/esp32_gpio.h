@@ -32,8 +32,10 @@ typedef struct Esp32GpioState {
     uint32_t gpio_pin[40];
     qemu_irq gpios[32];
     qemu_irq gpios_dir[32];
+    qemu_irq gpios_sync[1];
 } Esp32GpioState;
 
 #define ESP32_GPIOS "esp32_gpios"
 #define ESP32_GPIOS_IN "esp32_gpios_in"
 #define ESP32_GPIOS_DIR "esp32_gpios_dir"
+#define ESP32_GPIOS_SYNC "esp32_gpios_sync"
