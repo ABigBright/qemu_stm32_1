@@ -67,10 +67,12 @@ struct Stm32Gpio {
 
     /* IRQs which relay input pin changes to other STM32 peripherals */
     qemu_irq in_irq[STM32_GPIO_PIN_COUNT];
+
+    qemu_irq sync_irq[1];
 };
 
 #define STM32_GPIOS_DIR "stm32_gpios_dir"
-
+#define STM32_GPIOS_SYNC "stm32_gpios_sync"
 
 /* CALLBACKs */
 
@@ -200,6 +202,7 @@ static uint64_t stm32_gpio_read(void *opaque, hwaddr offset,
         case GPIOx_CRH_OFFSET:
             return s->GPIOx_CRy[1];
         case GPIOx_IDR_OFFSET:
+            qemu_set_irq( s->sync_irq[0],1);
             return s->in;
         case GPIOx_ODR_OFFSET:
             return s->GPIOx_ODR;
@@ -335,6 +338,7 @@ static void stm32_gpio_init(Object *obj)
     qdev_init_gpio_in(DEVICE(dev), stm32_gpio_in_trigger, STM32_GPIO_PIN_COUNT);
     qdev_init_gpio_out(DEVICE(dev), s->out_irq, STM32_GPIO_PIN_COUNT);
     qdev_init_gpio_out_named(DEVICE(dev), s->dir_irq, STM32_GPIOS_DIR, STM32_GPIO_PIN_COUNT);
+    qdev_init_gpio_out_named(DEVICE(dev), s->sync_irq, STM32_GPIOS_SYNC, 1);
 
     for(pin = 0; pin < STM32_GPIO_PIN_COUNT; pin++) {
         sysbus_init_irq(dev, &s->in_irq[pin]);

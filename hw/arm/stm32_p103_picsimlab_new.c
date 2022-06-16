@@ -32,6 +32,7 @@
 #include "hw/arm/boot.h"
 
 #define STM32_GPIOS_DIR "stm32_gpios_dir"
+#define STM32_GPIOS_SYNC "stm32_gpios_sync"
 
 typedef struct
 {
@@ -39,6 +40,7 @@ typedef struct
  qemu_irq pin_irq[100];
  qemu_irq *pout_irq;
  qemu_irq *pdir_irq;
+ qemu_irq *psync_irq;
  DeviceState *gpio_a;
  DeviceState *gpio_b;
  DeviceState *gpio_c;
@@ -65,6 +67,12 @@ static void
 pdir_irq_handler(void *opaque, int n, int dir)
 {
    (*picsimlab_dir_pin)(n, dir);
+}
+
+static void
+psync_irq_handler(void *opaque, int n, int dir)
+{
+   (*picsimlab_dir_pin)(-1, 0);
 }
 
 #define FLASH_SIZE 0x00020000
@@ -104,6 +112,12 @@ stm32_p103_picsimlab_init(MachineState *machine)
  assert (s->uart1);
  assert (s->uart3);
 
+ s->psync_irq = qemu_allocate_irqs (psync_irq_handler, NULL, 1);
+ qdev_connect_gpio_out_named(s->gpio_a, STM32_GPIOS_SYNC, 0 , s->psync_irq[0]);
+ qdev_connect_gpio_out_named(s->gpio_b, STM32_GPIOS_SYNC, 0 , s->psync_irq[0]);
+ qdev_connect_gpio_out_named(s->gpio_c, STM32_GPIOS_SYNC, 0 , s->psync_irq[0]);
+ qdev_connect_gpio_out_named(s->gpio_d, STM32_GPIOS_SYNC, 0 , s->psync_irq[0]);
+ 
  s->pdir_irq = qemu_allocate_irqs (pdir_irq_handler, NULL, 65);
  s->pout_irq = qemu_allocate_irqs (pout_irq_handler, NULL, 65);
 
