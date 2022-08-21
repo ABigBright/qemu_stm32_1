@@ -2,6 +2,10 @@
 QEMU README
 ===========
 
+
+This is copy of lcgamboa/qemu_stm32, delete the .github dir for some reason. just for learning.
+
+
 QEMU is a generic and open source machine & userspace emulator and
 virtualizer.
 
